@@ -164,6 +164,6 @@ filenames = ["c", "r", "w", "n", "nu", "theta", "a", "psi"]
 write_all(data, filenames)
 fig_vec = plot_all(para, data, filenames[1:8])
 for i in 1:8
-    savefig(fig_vec[i], "../figures/RA_learning/$(filenames[i]).pdf")
+    savefig(fig_vec[i], "../figures/RA_learning/simuls/$(filenames[i]).pdf")
 end
 =#

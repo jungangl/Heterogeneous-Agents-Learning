@@ -48,6 +48,20 @@ end
 
 
 
+function plot_all(para, data, filenames)
+    fig_vec = Vector{Plots.Plot{Plots.GRBackend}}(length(filenames))
+    ss_vec = [para.c̄, para.r̄, para.w̄, para.n̄, para.ν̄, 1., para.ā]
+    for i in 1:length(filenames)
+        println(i)
+        fig_vec[i] = plot(grid = false, title = "Representative Agents with Learning: $(filenames[i])")
+        plot!(fig_vec[i], data[i], label = "", lw = 0.2, alpha = 0.5)
+        plot!(fig_vec[i], ss_vec[i] * ones(para.T), label = "steady state level", ls = :dash)
+    end
+    return fig_vec
+end
+
+
+
 a = readdlm("../data/RA_rational/a.csv", ',')
 c = readdlm("../data/RA_rational/c.csv", ',')
 n = readdlm("../data/RA_rational/n.csv", ',')
@@ -56,8 +70,18 @@ r = readdlm("../data/RA_rational/r.csv", ',')
 θ = readdlm("../data/RA_rational/theta.csv", ',')
 w = readdlm("../data/RA_rational/w.csv", ',')
 x = construct_x(para, a, θ)
+data = c, r, w, n, ν, θ, a
 
 
-para = RAmodel()
+para = RAmodel(T = 100_000)
 ψ = compute_ψ(para, ν, x)
-writedlm("../data/RA_rational/psi.csv", ψ, ',')
+#writedlm("../data/RA_rational/psi.csv", ψ, ',')
+
+
+#=
+filenames = ["c", "r", "w", "n", "nu", "theta", "a"]
+fig_vec = plot_all(para, data, filenames)
+for i in 1:7
+    savefig(fig_vec[i], "../figures/RA_rational/simuls/$(filenames[i]).pdf")
+end
+=#
