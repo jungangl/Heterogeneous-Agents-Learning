@@ -1,4 +1,5 @@
-include("HA_stationary.jl")
+addprocs(25)
+@everywhere include("HA_stationary.jl")
 
 
 
@@ -9,8 +10,9 @@ end
 
 
 
-function compute_cmin!(para, w)
+@everywhere function compute_cmin(para, w)
   @unpack σ, γ, χ, A, S = para
+  cmin = zeros(S)
   for s in 1:S
     function f(logc)
       c = exp(logc)
@@ -18,58 +20,65 @@ function compute_cmin!(para, w)
       return c - A[s] * w * n
     end
     res = nlsolve(f, [0.]; inplace = false)
-    para.c_min[s] = exp(res.zero[1])
+    cmin[s] = exp(res.zero[1])
   end
+  return cmin
 end
 
 
 
-function backward_cf(para, cf′, a′grid, r, r′, w)
+@everywhere function backward_cf(para, cf′, a′grid, r, r′, w)
     @unpack σ, γ, β, χ, P, A, S, a_min, k_spline = para
-    compute_cmin!(para, w)
+    c_min = compute_cmin(para, w)
     n_con = 10
-    #for each element in a′grid,  compute the correspoding c level
-    cf = Spline1D[]
-    for s in 1:S
-        agrid = Float64[]
-        cgrid = Float64[]
-        Ucprime = zeros(S)
-        for a′ in a′grid
-            #For each value of a′,
-            #back out the corresponding value of a
-            for sprime in 1:S
-                Ucprime[sprime] = cf′[sprime](a′) ^ (-σ)
-            end
-            E_Uc = dot(P[s, :], Ucprime)
-            c = (β * (1 + r′) * E_Uc) ^ (-1 / σ)
+    N_a = length(a′grid)
+    #preallocate for speed
+    a_grid = zeros(S, n_con + N_a)
+    c_grid = zeros(S, n_con + N_a)
+    Uc′ = zeros(S)
+    ## For each element in a′grid, compute the correspoding c level
+    for (i_a′, a′) in enumerate(a′grid)
+        for s′ in 1:S
+            Uc′[s′] = (cf′[s′](a′)) ^ (-σ)
+        end
+        for s in 1:S
+            c = (β * (1 + r′) * dot(P[s, :], Uc′)) .^ (-1 / σ)
             n = max(1 - ((w * A[s] * c ^ (-σ)) / χ) ^ (-1 / γ), 0)
             a = (a′ + c - A[s] * w * n) / (1 + r)
-            #Next, the "if" condition implies agent is
-            #borrowing constrained for any smaller a
-            if (a′ == a_min) && (a > a_min)
-              c_min = para.c_min[s]
-              c_max = c
-              for ĉ in linspace(c_min, c_max, n_con)
-                n̂ = max(1 - ((w * A[s] * ĉ ^ (-σ)) / χ) ^ (-1 / γ), 0)
-                â = (0. + ĉ - A[s] * w * n̂) / (1 + r)
-                #add these new points to the endogenous grid,  note when
-                #c = c_min we will have â = 0. by construction.
-                push!(cgrid, ĉ)
-                push!(agrid, â)
-              end
-            else
-              push!(cgrid, c)
-              push!(agrid, a)
-            end
+            a_grid[s, i_a′ + n_con] = a
+            c_grid[s, i_a′ + n_con] = c
         end
-        push!(cf, Spline1D(agrid, cgrid; k = k_spline))
+    end
+    for s in 1:S
+        if a_grid[s, 1 + n_con] > a_min
+            for (i_ĉ, ĉ) in enumerate(linspace(c_min[s], c_grid[s, n_con + 1], n_con + 1)[1:n_con])
+                n̂ = max(1 - ((w * A[s] * ĉ ^ (-σ)) / χ) ^ (-1 / γ), 0)
+                â = (a_min + ĉ - A[s] * w * n̂) / (1 + r)
+                a_grid[s, i_ĉ] = â
+                c_grid[s, i_ĉ] = ĉ
+            end
+        else
+            a_grid[s, 1:n_con] = -Inf
+            c_grid[s, 1:n_con] = -Inf
+        end
+    end
+    #Now interpolate
+    cf = Vector{Dierckx.Spline1D}(S)
+    for s in 1:S
+        if c_grid[s, 1] == -Inf
+            indx = find(a_grid[s, :] .< a_min)[end]
+            cf[s] = Dierckx.Spline1D(a_grid[s, indx:end], c_grid[s, indx:end]; k = k_spline)
+        #If the constraint binds, we need to use all the grid points
+        else
+            cf[s] = Dierckx.Spline1D(a_grid[s, :], c_grid[s, :]; k = k_spline)
+        end
     end
     return cf
 end
 
 
 
-function get_cft(para, T, rt, wt, cf_ss)
+@everywhere function get_cft(para, T, rt, wt, cf_ss)
     @unpack S, a_min, a_max = para
     cft = Matrix{Dierckx.Spline1D}(S, T + 1) # running from time 0 to T
     cft[:, end] = cf_ss
@@ -88,10 +97,10 @@ end
 
 
 
-function next_π(para, π, cf, r, w)
+@everywhere function next_π(para, π, cf, r, w)
     @unpack N, S, α, a_min, a_max, A, χ, γ, σ, P = para
     bin_midpts = get_bins(a_min, a_max, N)
-    ϵngrid = zeros((N + 2) * S)
+    ngrid = zeros((N + 2) * S)
     π′ = zeros(length(π))
     for indx in 1:length(π)
         #transition to iprime with prob ω
@@ -103,7 +112,7 @@ function next_π(para, π, cf, r, w)
         c = cf[s](a)
         n = max(1 - ((w * A[s] * c ^ (-σ)) / χ) ^ (-1 / γ), 0)
         a′ = (1 + r) * a + A[s] * w * n - c
-        ϵngrid[indx] = n * A[s]
+        ngrid[indx] = n * A[s]
         #check if aprime falls into the very first or very last bin
         if a′ <= 0.0
             i′ = 1
@@ -127,53 +136,114 @@ function next_π(para, π, cf, r, w)
             end
         end
     end
-    return π′, ϵngrid
+    return π′, ngrid
 end
 
 
 
-function get_πt(para, cft, rt, wt, π̄, ϵn̄grid, T)
+@everywhere function get_πt(para, cft, rt, wt, π̄, n̄grid, T)
     @unpack S, N = para
     πt = zeros(length(π̄), T + 1)
-    ϵngrid_t = zeros((N + 2) * S, T + 1)
+    ngrid_t = zeros((N + 2) * S, T + 1)
     πt[:, 1] = π̄
     # forwards compute the evolution of distribution π
     for t in 1:T
         r = rt[t]
         w = wt[t]
-        πt[:, t + 1], ϵngrid_t[:, t] = next_π(para, πt[:, t], cft[:, t], r, w)
+        πt[:, t + 1], ngrid_t[:, t] = next_π(para, πt[:, t], cft[:, t], r, w)
     end
-    ϵngrid_t[:, T + 1] = ϵn̄grid
-    return πt, ϵngrid_t
+    ngrid_t[:, T + 1] = n̄grid
+    return πt, ngrid_t
 end
 
 
 
-function realized_kpath(πt, ϵngrid_t, agrid)
+@everywhere function realized_kpath(πt, ngrid_t, agrid)
     T = length(πt[1, :]) - 1
     k̂ = zeros(T + 1)
     for t in 1:T + 1
         K = πt[:, t]' * agrid
-        N = πt[:, t]' * ϵngrid_t[:, t]
+        N = πt[:, t]' * ngrid_t[:, t]
         k̂[t] = K / N
     end
     return k̂
 end
 
 
+function solve_transition(para)
+    @unpack a_min, a_max, ρ, α, δ, S = para
+    T = 300
+    lnθ₀ = para.σ_ϵ
+    lnθt = [lnθ₀ * ρ .^ (t - 1) for t in 1:T + 1]
+    θt = exp.(lnθt) # running from time 0 to T
+    para, π̄, k̄, n̄grid,_, agrid = calibrate_stationary(para)
+    cf_ss = get_cf(para)
+    function f(k)
+        k = vcat(k, k̄) #running from time 0 to T
+        rt = α * θt .* k .^ (α - 1) - δ
+        wt = (1 - α) * θt .* k .^ α
+        cft = get_cft(para, T, rt, wt, cf_ss)
+        πt, ngrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid, T)
+        k̂ = realized_kpath(πt, ngrid_t, agrid)
+        diff = norm(k[1:T] - k̂[1:T], Inf)
+        println(diff)
+        return k[1:T] - k̂[1:T]
+    end
 
-function compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, ϵn̄grid, π̄)
+    function f!(F,z)
+        F[:] = f(z)
+    end
+
+    function j!(J,z)
+        N = length(z)
+        h = 1e-5
+        points = hcat(z,z .+ h*eye(N))
+        results = SharedArray{Float64}((N,N+1))
+        @sync @parallel for i in 1:N+1
+            results[:,i] = f(points[:,i])
+        end
+        for i in 1:N
+            J[:,i] .= (results[:,i+1] .- results[:,1])./(h)
+        end
+    end
+
+    function fj!(F,J,z)
+        N = length(z)
+        h = 1e-6
+        points = hcat(z,z .+ h*eye(N))
+        results = SharedArray{Float64}((N,N+1))
+        @sync @parallel for i in 1:N+1
+            results[:,i] = f(points[:,i])
+        end
+        for i in 1:N
+            J[:,i] .= (results[:,i+1] .- results[:,1])./(h)
+        end
+        F[:] = results[:,1];
+    end
+    #k = readdlm("../data/k_trans.csv", ',')
+    initial_k = ones(T) * k̄
+    initial_F = zeros(T)
+    df = OnceDifferentiable(f!,j!,fj!,initial_k,initial_F)
+    res = nlsolve(df,initial_k)
+    k_trans = res.zero::Vector{Float64}
+    coeffs = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
+    Ct, Nt, Kt = compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
+    return k_trans, coeffs, Ct, Nt, Kt
+end
+
+
+function compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     @unpack α, δ, a_min, a_max, N, σ = para
     r̄ = α * k̄ ^ (α - 1) - δ
     k = vcat(k_trans, k̄) #running from time 0 to T
     rt = α * θt .* k .^ (α - 1) - δ
     wt = (1 - α) * θt .* k .^ α
     cft = get_cft(para, T, rt, wt, cf_ss)
-    πt, ϵngrid_t = get_πt(para, cft, rt, wt, π̄, ϵn̄grid, T)
+    πt, ngrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid, T)
     bin_midpts = get_bins(a_min, a_max, N)
     # Compute ln(K_t - \bar K) for each year
-    Kt = [k[t] * ϵngrid_t[:, t]' * πt[:, t] for t in 1:T + 1]
-    K̄ = k̄ * ϵn̄grid' * π̄
+    Kt = [k[t] * ngrid_t[:, t]' * πt[:, t] for t in 1:T + 1]
+    K̄ = k̄ * n̄grid' * π̄
     # Compute $\hat \nu^i_t$ for each bin for each period
     logν̂t = similar(πt)
     for t in 1:size(logν̂t, 2)
@@ -197,48 +267,20 @@ end
 
 
 
-function solve_transition(para)
-    @unpack a_min, a_max, ρ, α, δ, S = para
-    T = 100
-    lnθ₀ = para.σ_ϵ
-    lnθt = [lnθ₀ * ρ .^ (t - 1) for t in 1:T + 1]
-    θt = exp.(lnθt) # running from time 0 to T
-    para, π̄, k̄, ϵn̄_grid, n̄grid, agrid = calibrate_stationary(para)
-    cf_ss = get_cf(para)
-    function f(k)
-        k = vcat(k, k̄) #running from time 0 to T
-        rt = α * θt .* k .^ (α - 1) - δ
-        wt = (1 - α) * θt .* k .^ α
-        cft = get_cft(para, T, rt, wt, cf_ss)
-        πt, ϵngrid_t = get_πt(para, cft, rt, wt, π̄, ϵn̄grid, T)
-        k̂ = realized_kpath(πt, ϵngrid_t, agrid)
-        diff = norm(k[1:T] - k̂[1:T], Inf)
-        println(diff)
-        return k[1:T] - k̂[1:T]
-    end
-    #k = readdlm("../data/k_trans.csv", ',')
-    k = ones(100) * k̄
-    res = nlsolve(f, k; inplace = false)
-    k_trans = res.zero
-    k_trans = k
-    coeffs = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, ϵn̄grid, π̄)
-    Ct, Nt, Kt = compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, ϵn̄grid, π̄)
-    return k_trans, coeffs, Ct, Nt, Kt
-end
 
 
 
-function compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, ϵn̄grid, π̄)
+function compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     @unpack α, δ, a_min, a_max, N, σ = para
     r̄ = α * k̄ ^ (α - 1) - δ
     k = vcat(k_trans, k̄) #running from time 0 to T
     rt = α * θt .* k .^ (α - 1) - δ
     wt = (1 - α) * θt .* k .^ α
     cft = get_cft(para, T, rt, wt, cf_ss)
-    πt, ϵngrid_t = get_πt(para, cft, rt, wt, π̄, ϵn̄grid, T)
+    πt, ngrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid, T)
     bin_midpts = get_bins(a_min, a_max, N)
     # Compute ln(K_t - \bar K) for each year
-    Kt = [k[t] * ϵngrid_t[:, t]' * πt[:, t] for t in 1:T + 1]
+    Kt = [k[t] * ngrid_t[:, t]' * πt[:, t] for t in 1:T + 1]
     Ct = zeros(T)
     Nt = zeros(T)
     for t in 1:T
@@ -249,7 +291,7 @@ function compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, ϵn̄grid, π̄
             cgrid[indx] = cft[s, t](a)
         end
         Ct[t] = dot(πt[:, t], cgrid)
-        Nt[t] = dot(πt[:, t], ϵngrid_t[:, t])
+        Nt[t] = dot(πt[:, t], ngrid_t[:, t])
     end
     return Ct, Nt, Kt
 end

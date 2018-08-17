@@ -3,3 +3,4 @@
 data/*
 *.dat
 *.csv
+*.DS_Store
