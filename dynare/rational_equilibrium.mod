@@ -6,12 +6,12 @@ parameters sigma gamma beta rho alpha delta sigma_eps X;
 //Initialize our parameters.
 sigma = 2.;
 gamma = 2.;
-beta = 0.98;
-rho = 0.85;
-alpha = 0.33;
-delta = 0.023;
-sigma_eps = 0.014;
-X = 1.97; 
+beta = 0.9900130264871999;
+rho = 0.95;
+alpha = 0.36;
+delta = 0.025;
+sigma_eps = 0.007;
+X = 1.2499931387511778; 
 
 /*
 Specify the model that characterizes the endo variables.
@@ -40,15 +40,15 @@ end;
 
 //Give initial values
 initval;
-  k = 6.19;
-  c = 0.0672;
-  l = 0.7;
+  k = 12.67058003443171;
+  c = 0.9181848202339157;
+  l = 0.6666666666666667;
   ltheta = 0; 
   eps = 0;
-  r = 1/beta -1;
-  w = 1.82;
+  r = 0.01008771929824561;
+  w = 2.3711026965018402;
   theta = 1;
-  nu = 1.;
+  nu = 1.1981160163055604;
   n = 1-l;
 end;
 
@@ -63,4 +63,4 @@ var eps =  sigma_eps^2;
 end;
 
 //Simulate the evolution of the variables
-stoch_simul(periods=10000, drop=1000,order=3);
+stoch_simul(periods=100000, drop=10000,order=3);
