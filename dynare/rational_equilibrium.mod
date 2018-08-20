@@ -63,4 +63,4 @@ var eps =  sigma_eps^2;
 end;
 
 //Simulate the evolution of the variables
-stoch_simul(periods=100000, drop=10000,order=3);
+stoch_simul(periods=100000, drop=10000,order=1);

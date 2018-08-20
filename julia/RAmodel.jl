@@ -1,3 +1,4 @@
+using NLsolve, Parameters, Distributions, Plots, Roots
 @with_kw type RAmodel
   #fundamental paramters
   K2Y::Float64 = 10.26 #targeted

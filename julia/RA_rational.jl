@@ -3,7 +3,7 @@ include("RAmodel.jl")
 
 
 
-#=
+
 mat"""
     addpath /Applications/Dynare/4.5.1/matlab/
     cd('../dynare')
@@ -16,7 +16,7 @@ mat"""
     csvwrite('../data/RA_rational/theta.csv', theta)
     csvwrite('../data/RA_rational/w.csv', w)
 """
-=#
+
 
 
 
@@ -28,23 +28,18 @@ end
 
 
 
-function construct_x(para, a, θ)
+function construct_ψ(para,ν,a, θ)
     T = length(a)
-    x = ones(T, 3)
-    for t in 1:T
-        x[t, 2:3] = [log(a[t] / para.ā); log(θ[t])]
+    x = ones(T-2, 3)
+    y = zeros(T-2)
+    for t in 1:T-2
+        x[t, 2:3] = [log(a[t] / para.ā); log(θ[t+1])]
+        y[t] = log.(ν[t+2] / para.ν̄)
     end
-    return x
-end
-
-
-
-function compute_ψ(para, ν, x)
-    LHS = log.(ν[2:end] / para.ν̄)
-    RHS = x[1:end - 1, :]
-    ψ = OLSestimator(RHS, LHS)
+    ψ = OLSestimator(y, x)
     return ψ
 end
+
 
 
 
@@ -69,12 +64,10 @@ n = readdlm("../data/RA_rational/n.csv", ',')
 r = readdlm("../data/RA_rational/r.csv", ',')
 θ = readdlm("../data/RA_rational/theta.csv", ',')
 w = readdlm("../data/RA_rational/w.csv", ',')
-x = construct_x(para, a, θ)
-data = c, r, w, n, ν, θ, a
 
 
 para = RAmodel(T = 100_000)
-ψ = compute_ψ(para, ν, x)
+ψ = construct_ψ(para,ν,a,θ)
 #writedlm("../data/RA_rational/psi.csv", ψ, ',')
 
 
