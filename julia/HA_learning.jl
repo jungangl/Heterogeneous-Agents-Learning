@@ -2,6 +2,34 @@ include("HA_stationary.jl")
 
 
 
+
+## Define the function that write as the code runs
+function write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, str)
+    writedlm("../data/HA_learning/simulations/$str/a/$t.csv", a, ',')
+    writedlm("../data/HA_learning/simulations/$str/mean_a/$t.csv", mean(a), ',')
+    writedlm("../data/HA_learning/simulations/$str/c/$t.csv", c, ',')
+    writedlm("../data/HA_learning/simulations/$str/mean_c/$t.csv", mean(c), ',')
+    writedlm("../data/HA_learning/simulations/$str/n/$t.csv", n, ',')
+    writedlm("../data/HA_learning/simulations/$str/mean_n/$t.csv", mean(n), ',')
+    writedlm("../data/HA_learning/simulations/$str/nu/$t.csv", ν, ',')
+    writedlm("../data/HA_learning/simulations/$str/mean_nu/$t.csv", mean(ν), ',')
+    writedlm("../data/HA_learning/simulations/$str/nu_bar/$t.csv", ν̄, ',')
+    writedlm("../data/HA_learning/simulations/$str/mean_nu_bar/$t.csv", mean(ν̄), ',')
+    writedlm("../data/HA_learning/simulations/$str/nu_bar_c/$t.csv", ν̄c, ',')
+    writedlm("../data/HA_learning/simulations/$str/mean_nu_bar_c/$t.csv", mean(ν̄c), ',')
+    writedlm("../data/HA_learning/simulations/$str/psi/$t.csv", ψ, ',')
+    writedlm("../data/HA_learning/simulations/$str/mean_psi/$t.csv", mean(ψ, 1), ',')
+    writedlm("../data/HA_learning/simulations/$str/r/$t.csv", r, ',')
+    writedlm("../data/HA_learning/simulations/$str/R_cov/$t.csv", R, ',')
+    writedlm("../data/HA_learning/simulations/$str/s/$t.csv", s, ',')
+    writedlm("../data/HA_learning/simulations/$str/mean_s/$t.csv", mean(s), ',')
+    writedlm("../data/HA_learning/simulations/$str/theta/$t.csv", θ, ',')
+    writedlm("../data/HA_learning/simulations/$str/w/$t.csv", w, ',')
+    writedlm("../data/HA_learning/simulations/$str/x/$t.csv", x, ',')
+end
+
+
+
 #------------------------------------------------------------------------#
 ## Let c̄(a, s) be the consumption function in the steady state
 ## Let ψ be the beliefs of the agents and x be the aggregate states
@@ -233,24 +261,6 @@ end
 
 
 
-## Initialze distributions for asset a, productivity s and beleifs ψ
-## based on draws from the stationary distribution
-## This initialization assumes homogeneity in beliefs - all initialized as ψ̄
-## This function is used by simul_learning
-function init_asψ(agent_num, bin_midpts, draws, ψ̄)
-    ai_1 = zeros(agent_num)
-    si_1 = zeros(Int64, agent_num)
-    ψi_0 = zeros(agent_num,3)
-    for (i, draw) in enumerate(draws)
-        ai_1[i] = bin_midpts[draw[1]]
-        si_1[i] = draw[2]
-        ψi_0[i,:] = ψ̄
-    end
-    return ai_1, si_1, ψi_0
-end
-
-
-
 ## Update the variance-covariance matrix for least square learning
 function update_R(R, x, t, γ_gain, keep_const)
     R′ = zeros(3, 3)
@@ -280,120 +290,6 @@ end
 
 
 
-## Define a truncating function based on the percentage
-function trunc_data!(data, perc, T)
-    τ = floor(Int64, (100 - perc) / 100 * T)
-    for i in 1:length(data)
-        if ndims(data[i]) == 1
-            data[i] = (data[i])[(τ + 1):T]
-        elseif ndims(data[i]) == 2
-            data[i] = (data[i])[:, (τ + 1):T]
-        elseif ndims(data[i]) == 3
-            data[i] = (data[i])[:, :, (τ + 1):T]
-        end
-    end
-end
-
-
-
-## Define a function that initialize the data of interest
-function init_data_learning(agent_num, bin_midpts, draws, ψ̄, R̄, K̄)
-    r, w = zeros(2)
-    c, n, ν, ν̄, ν̄c = [zeros(agent_num) for i in 1:5]
-    a, s, ψ = init_asψ(agent_num, bin_midpts, draws, ψ̄)
-    s′ = zeros(Int64, agent_num)
-    a′ = zeros(agent_num)
-    ψ′ = zeros(agent_num, 3)
-    R = zeros(3, 3)
-    R′ = zeros(3, 3)
-    R = R̄
-    R′ = R̄
-    θ, θ′  = ones(2)
-    x_ = [1.; log(mean(a) / K̄); log(θ)]
-    x = x_
-    x′ = ones(3)
-    return c, n, ν, ν̄, ν̄c, r, w, s, s′, a, a′, ψ, ψ′, R, R′, θ, θ′, x_, x, x′
-end
-
-
-
-## Define a function that initialize the data of interest
-function init_data(agent_num, ψ̄, R̄, K̄, a, θ_t)
-    r, w = zeros(2)
-    c, n, ν, ν̄, ν̄c = [zeros(agent_num) for i in 1:5]
-    s′ = zeros(Int64, agent_num)
-    a′ = zeros(agent_num)
-    ψ′ = zeros(agent_num, 3)
-    R = zeros(3, 3)
-    R′ = zeros(3, 3)
-    R = R̄
-    R′ = R̄
-    θ, θ′  = θ_t[1:2]
-    x_ = [1.; log(mean(a) / K̄); log(θ)]
-    x = x_
-    x′ = ones(3)
-    return c, n, ν, ν̄, ν̄c, r, w, s′, a′, ψ′, R, R′,θ, θ′, x_, x, x′
-end
-
-
-
-## Define the function that write as the code runs
-function write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, str)
-    writedlm("../data/$str/a/$t.csv", a, ',')
-    writedlm("../data/$str/mean_a/$t.csv", mean(a), ',')
-    writedlm("../data/$str/c/$t.csv", c, ',')
-    writedlm("../data/$str/mean_c/$t.csv", mean(c), ',')
-    writedlm("../data/$str/n/$t.csv", n, ',')
-    writedlm("../data/$str/mean_n/$t.csv", mean(n), ',')
-    writedlm("../data/$str/nu/$t.csv", ν, ',')
-    writedlm("../data/$str/mean_nu/$t.csv", mean(ν), ',')
-    writedlm("../data/$str/nu_bar/$t.csv", ν̄, ',')
-    writedlm("../data/$str/mean_nu_bar/$t.csv", mean(ν̄), ',')
-    writedlm("../data/$str/nu_bar_c/$t.csv", ν̄c, ',')
-    writedlm("../data/$str/mean_nu_bar_c/$t.csv", mean(ν̄c), ',')
-    writedlm("../data/$str/psi/$t.csv", ψ, ',')
-    writedlm("../data/$str/mean_psi/$t.csv", mean(ψ, 1), ',')
-    writedlm("../data/$str/r/$t.csv", r, ',')
-    writedlm("../data/$str/R_cov/$t.csv", R, ',')
-    writedlm("../data/$str/s/$t.csv", s, ',')
-    writedlm("../data/$str/mean_s/$t.csv", mean(s), ',')
-    writedlm("../data/$str/theta/$t.csv", θ, ',')
-    writedlm("../data/$str/w/$t.csv", w, ',')
-    writedlm("../data/$str/x/$t.csv", x, ',')
-end
-
-
-
-## Define the function that reads the data
-function read_data(para, str)
-    @unpack agent_num, T = para
-    ai_t = zeros(agent_num, T)
-    ψi_t = zeros(agent_num, 3, 1431)
-    ci_t, ni_t, νi_t, ai_t, ν̄i_t, ν̄ci_t = [zeros(agent_num, T) for _ in 1:6]
-    si_t, ψi_t, R_t = zeros(Int64, agent_num, T), zeros(agent_num, 3, T), zeros(3, 3, T)
-    r_t, w_t, θ_t = [zeros(T) for _ in 1:3]
-    x_t = zeros(3, T)
-    for t in 1:T
-        ai_t[:, t] = readdlm("../data/$str/a/$t.csv", ',')
-        ci_t[:, t] = readdlm("../data/$str/c/$t.csv", ',')
-        ni_t[:, t] = readdlm("../data/$str/n/$t.csv", ',')
-        νi_t[:, t] = readdlm("../data/$str/nu/$t.csv", ',')
-        ν̄i_t[:, t] = readdlm("../data/$str/nu_bar/$t.csv", ',')
-        ν̄ci_t[:, t] = readdlm("../data/$str/nu_bar_c/$t.csv", ',')
-        ψi_t[:, :, t] = readdlm("../data/$str/psi/$t.csv", ',')
-        r_t[t] = readdlm("../data/$str/r/$t.csv", ',')[1]
-        R_t[:, :, t] = readdlm("../data/$str/R_cov/$t.csv", ',')
-        si_t[:, t] = readdlm("../data/$str/s/$t.csv", ',')
-        θ_t[t] = readdlm("../data/$str/theta/$t.csv", ',')[1]
-        w_t[t] = readdlm("../data/$str/w/$t.csv", ',')[1]
-        x_t[:, t] = readdlm("../data/$str/x/$t.csv", ',')
-    end
-    return ci_t, ni_t, νi_t, ai_t, ν̄i_t, ν̄ci_t, si_t, ψi_t, R_t, r_t, w_t, θ_t, x_t
-end
-
-
-
-
 ## Define the function that sets the range of ϕ = ψ ⋅ x
 function set_ϕ_range!(para, ψ, x)
     ϕ_vec = zeros(para.agent_num)
@@ -413,20 +309,59 @@ end
 
 
 
+## Initialze distributions for asset a, productivity s and beleifs ψ
+## based on draws from the stationary distribution
+## This initialization assumes homogeneity in beliefs - all initialized as ψ̄
+## This function is used by simul_learning
+function init_asψ(agent_num, bin_midpts, draws, ψ̄)
+    ai_1 = zeros(agent_num)
+    si_1 = zeros(Int64, agent_num)
+    ψi_0 = zeros(agent_num,3)
+    for (i, draw) in enumerate(draws)
+        ai_1[i] = bin_midpts[draw[1]]
+        si_1[i] = draw[2]
+        ψi_0[i,:] = ψ̄
+    end
+    return ai_1, si_1, ψi_0
+end
+
+
+
+####################################################################################################
+## Define a function that initialize the data of interest
+function init_data_learning(agent_num, bin_midpts, draws, ψ̄, R̄, ā)
+    r, w = zeros(2)
+    c, n, ν, ν̄, ν̄c = [zeros(agent_num) for i in 1:5]
+    a, s, ψ = init_asψ(agent_num, bin_midpts, draws, ψ̄)
+    s′ = zeros(Int64, agent_num)
+    a′ = zeros(agent_num)
+    ψ′ = zeros(agent_num, 3)
+    R = zeros(3, 3)
+    R′ = zeros(3, 3)
+    R = R̄
+    R′ = R̄
+    θ, θ′  = ones(2)
+    x_ = [1.; log(mean(a) / ā); log(θ)]
+    x = x_
+    x′ = ones(3)
+    return c, n, ν, ν̄, ν̄c, r, w, s, s′, a, a′, ψ, ψ′, R, R′, θ, θ′, x_, x, x′
+end
+
+
 
 ## Simulate the economy based on learning
 ## 1. νi_t - current marginal utility ν,
 ## 2. ν̄i_t - expected future marginal utility ν̄,
 ## 3. ν̄ci_t - current marginal utility in steady state ν̄c
-## 4. x_t - vector of aggregate states [1; log(mean(a) / K̄); log(θ_t[t])]
+## 4. x_t - vector of aggregate states [1; log(mean(a) / ā); log(θ_t[t])]
 function simul_learning(para, π, str)
-    @unpack N, a_min, a_max, agent_num, T, K̄, ρ, σ_ϵ, γ_gain, ψ̄, R̄ = para
+    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄ = para
     ## Initialize functions
     cf = get_cf(para)
     bin_midpts = get_bins(a_min, a_max, N)
     draws = dimtrans1to2.(N, rand(DiscreteRV(π), agent_num))
     ## Initialize data of interest
-    c, n, ν, ν̄, ν̄c, r, w, s, s′, a, a′, ψ, ψ′, R, R′, θ, θ′, x_, x, x′ = init_data_learning(agent_num, bin_midpts, draws, ψ̄, R̄, K̄)
+    c, n, ν, ν̄, ν̄c, r, w, s, s′, a, a′, ψ, ψ′, R, R′, θ, θ′, x_, x, x′ = init_data_learning(agent_num, bin_midpts, draws, ψ̄, R̄, ā)
     set_ϕ_range!(para, ψ, x)
     #= Loop through t = 1..T, each variable is index comtemporanously.
     Here the vector ψ[:,t] = {ψ_0,ψ_1,ψ_2,...} R[:,:,t] = {R_0,R_1,R_2,...}
@@ -440,7 +375,7 @@ function simul_learning(para, π, str)
         if t == T break end
         s′ = update_s(para, s, t)
         θ′ = drawθ(θ, σ_ϵ, ρ)
-        x′ = [1; log(mean(a′) / K̄); log(θ′)]
+        x′ = [1; log(mean(a′) / ā); log(θ′)]
         R′ = update_R(R, x, t - 1, γ_gain, false)
         if t == 1
             ψ′ = ψ
@@ -458,6 +393,27 @@ function simul_learning(para, π, str)
         set_ϕ_range!(para, ψ, x)
     end
 end
+####################################################################################################
+
+
+####################################################################################################
+## Define a function that initialize the data of interest
+function init_data_irf(agent_num, ψ̄, R̄, ā, a, θ_t)
+    r, w = zeros(2)
+    c, n, ν, ν̄, ν̄c = [zeros(agent_num) for i in 1:5]
+    s′ = zeros(Int64, agent_num)
+    a′ = zeros(agent_num)
+    ψ′ = zeros(agent_num, 3)
+    R = zeros(3, 3)
+    R′ = zeros(3, 3)
+    R = R̄
+    R′ = R̄
+    θ, θ′  = θ_t[1:2]
+    x_ = [1.; log(mean(a) / ā); log(θ)]
+    x = x_
+    x′ = ones(3)
+    return c, n, ν, ν̄, ν̄c, r, w, s′, a′, ψ′, R, R′,θ, θ′, x_, x, x′
+end
 
 
 
@@ -467,7 +423,7 @@ end
 ## Return variables of interest: averge (consumptions, labors, assets, marginal utilitys, beliefs),
 ## and interest rates and wages.
 function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
-    @unpack N, a_min, a_max, agent_num, K̄, ρ, σ_ϵ, γ_gain, ψ̄, R̄ = para
+    @unpack N, a_min, a_max, agent_num, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄ = para
     str = "irf_$gain/$t_sample/$(prepost)_shock"
     T = length(θ_t)
     ## Initialize functions
@@ -475,7 +431,7 @@ function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
     a = convert(Array{Float64, 2}, readdlm("../data/steadystates_$gain/a/$t_sample.csv", ','))
     s = convert(Array{Int64, 2}, readdlm("../data/steadystates_$gain/s/$t_sample.csv", ','))
     ψ = convert(Array{Float64, 2}, readdlm("../data/steadystates_$gain/psi/$t_sample.csv", ','))
-    c, n, ν, ν̄, ν̄c, r, w, s′, a′, ψ′, R, R′,θ, θ′, x_, x, x′ = init_data(agent_num, ψ̄, R̄, K̄, a, θ_t)
+    c, n, ν, ν̄, ν̄c, r, w, s′, a′, ψ′, R, R′,θ, θ′, x_, x, x′ = init_data_irf(agent_num, ψ̄, R̄, ā, a, θ_t)
     set_ϕ_range!(para, ψ, x)
     #=Loop through t = 1..T, each variable is index comtemporanously.
     Here the vector ψ[:,t] = {ψ_0,ψ_1,ψ_2,...} R[:,:,t] = {R_0,R_1,R_2,...}
@@ -489,7 +445,7 @@ function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
         if t == T break end
         s′ = update_s(para, s, t)
         θ′ = θ_t[t + 1]
-        x′ = [1; log(mean(a′) / K̄); log(θ′)]
+        x′ = [1; log(mean(a′) / ā); log(θ′)]
         R′ = update_R(R, x, t - 1, γ_gain, keep_const)
         if t == 1
             ψ′ = ψ
@@ -595,23 +551,8 @@ function write_irf(irf_het, irf_hom_update, irf_hom_const, irfnames)
         writedlm("../data/$(irfnames[i]).csv", irfs[i], ',')
     end
 end
+####################################################################################################
 
-
-
-## Plot the long simulation
-function plot_long(range)
-    paths = ["zeros", "steadystates"]
-    p_vec = [plot() for i in 1:2]
-    ψ̄_ss = [3.866160387819722e-5; -0.5747956126764134; -0.4432431327901116]
-    for i in 1:2
-        ψ̄ = readdlm("../data/$(paths[i])/mean_psi/combined.csv", ',')
-        for j in 1:3
-            plot!(p_vec[i], ψ̄[range, j], label = "psi$j", title = "from $(paths[i])")
-            plot!(p_vec[i], x -> ψ̄_ss[j], lw = 2., label = "")
-        end
-    end
-    return p_vec
-end
 
 
 ## Housekeeping
@@ -626,38 +567,39 @@ ps = parse_args(s)
 indx = ps["i"]
 
 
+
 para = HAmodel()
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 para.T = 5
 para.agent_num = 100_000
 str = ""
 if indx == 1
-    str = "zeros_0.005"
+    str = "from_zeros/gain_0.005"
     para.ψ̄ = zeros(3)
     para.γ_gain = t -> 0.005
 elseif indx == 2
-    str = "zeros_0.01"
+    str = "from_zeros/gain_0.01"
     para.ψ̄ = zeros(3)
     para.γ_gain = t -> 0.01
 elseif indx == 3
-    str = "steadystates_0.005"
-    para.ψ̄ = [3.866160387819722e-5; -0.5747956126764134; -0.4432431327901116]
+    str = "from_RA/gain_0.005"
+    para.ψ̄ = [-0.00131466; -0.765091; -0.655608]
     para.γ_gain = t -> 0.005
 elseif indx == 4
-    str = "steadystates_0.01"
+    str = "from_RA/gain_0.01"
+    para.ψ̄ = [-0.00131466; -0.765091; -0.655608]
+    para.γ_gain = t -> 0.01
+elseif indx == 5
+    str = "from_HA/gain_0.005"
+    para.ψ̄ = [3.866160387819722e-5; -0.5747956126764134; -0.4432431327901116]
+    para.γ_gain = t -> 0.005
+elseif indx == 6
+    str = "from_HA/gain_0.01"
     para.ψ̄ = [3.866160387819722e-5; -0.5747956126764134; -0.4432431327901116]
     para.γ_gain = t -> 0.01
 end
 simul_learning(para, π, str)
 
-
-
-#=
-ci_t, ni_t, νi_t, ai_t, ν̄i_t, ν̄ci_t, si_t, ψi_t, R_t, r_t, w_t, θ_t, x_t = read_data(para, str)
-p_vec = plot_long(1:10000)
-savefig(p_vec[1], "../figures/zeros/long_simulation.pdf")
-savefig(p_vec[2], "../figures/steadystates/long_simulation.pdf")
-=#
 
 
 

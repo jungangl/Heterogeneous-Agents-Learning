@@ -13,6 +13,7 @@ using NLsolve, Dierckx, Plots, Distributions, ArgParse
     χ::Float64 = 1.2943285641437323
     γ_gain::Function  = t -> 0.02
     ## Steady state values
+    ā::Float64 = 14.16447244048578
     r̄::Float64 = α * inv(K2Y) - δ
     w̄::Float64 = (1 - α) * (K2Y) ^ (α / (1 - α))
     n̄::Float64 = 1/3
