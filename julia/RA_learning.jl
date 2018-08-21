@@ -152,7 +152,6 @@ gain = .005
 para.γ_gain = t -> gain
 para = calibrate_ss(para)
 para.T = 100_000
-para.ψ̄ =  [0.00015195296492383106; -0.7562646342465844; -0.6417144194500661]
 data = simul_learning(para)
 c_t, r_t, w_t, n_t, ν_t, θ_t, a_t, ψ_t = data
 

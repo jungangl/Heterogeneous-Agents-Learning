@@ -23,5 +23,5 @@ using NLsolve, Parameters, Distributions, Plots, Roots
   R̄::Matrix{Float64} =  [ 1.0000    0.0013    0.0001;
                           0.0013    0.0014    0.0004;
                           0.0001    0.0004    0.0007]
-  ψ̄::Vector{Float64} =  [ 1.77e-5; -0.731; -0.4506]
+  ψ̄::Vector{Float64} =  [ -0.001314661; -0.765090668; -0.655607579]
 end
