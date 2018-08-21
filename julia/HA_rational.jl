@@ -1,4 +1,3 @@
-addprocs(25)
 @everywhere include("HA_stationary.jl")
 
 
@@ -220,12 +219,14 @@ function solve_transition(para)
         end
         F[:] = results[:,1];
     end
-    #k = readdlm("../data/k_trans.csv", ',')
+    k_trans = readdlm("../data/HA_rational/k_trans.csv", ',')
+    #=
     initial_k = ones(T) * k̄
     initial_F = zeros(T)
     df = OnceDifferentiable(f!,j!,fj!,initial_k,initial_F)
     res = nlsolve(df,initial_k)
     k_trans = res.zero::Vector{Float64}
+    =#
     coeffs = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     Ct, Nt, Kt = compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     return k_trans, coeffs, Ct, Nt, Kt
@@ -300,4 +301,5 @@ end
 
 para = HAmodel()
 k_trans, coeffs, Ct, Nt, Kt = solve_transition(para)
-writedlm("../data/HA_rational/k_trans.csv", k_trans, ',')
+writedlm("../data/HA_rational/psi.csv", coeffs, ',')
+#writedlm("../data/HA_rational//k_trans.csv", k_trans, ',')
