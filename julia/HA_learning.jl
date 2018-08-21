@@ -45,7 +45,7 @@ end
 ## Given r, w, for each s
 ## compute the vector of consumptions chosen by the agent if a′ = a = a_min.
 function compute_cmin2!(para, r, w, cf)
-  @unpack σ, γ, χ, w̄, r̄, A, S, a_min = para
+  @unpack σ, γ, χ, A, S, a_min = para
   for s in 1:S
       function f(logc)
           c = exp.(logc)
@@ -74,17 +74,16 @@ function get_cf2(para, cf, r, w, n_con = 10)
                   linspace(a_min + 2, a_max, 80)[2:end])
     N_a = length(a′grid)
     #preallocate for speed
-    a_grid = zeros(S,N_ϕ,N_a+n_con)
-    c_grid = zeros(S,N_ϕ,N_a+n_con)
+    a_grid = zeros(S, N_ϕ, N_a + n_con)
+    c_grid = zeros(S, N_ϕ, N_a + n_con)
     Uc′ = zeros(S)
-    for (i_a,a′) in enumerate(a′grid)
+    for (i_a, a′) in enumerate(a′grid)
         for s′ in 1:S
-            Uc′[s′] = (cf[s′](a′))^(-σ)
+            Uc′[s′] = (cf[s′](a′)) ^ (-σ)
         end
         for (i_ϕ, ϕ) in enumerate(ϕ_vec)
             for s in 1:S
-
-                c = (exp(ϕ) * β * (1 + r̄) * dot(P[s,:],Uc′) ).^(-1/σ)
+                c = (exp(ϕ) * β * (1 + r̄) * dot(P[s, :], Uc′) ) .^ (-1 / σ)
                 n = max(1 - ((w * A[s] * c ^ (-σ)) / χ) ^ (-1 / γ), 0.)
                 a = (a′ + c - A[s] * w * n) / (1 + r)
                 a_grid[s, i_ϕ, i_a + n_con] = a
@@ -114,7 +113,8 @@ function get_cf2(para, cf, r, w, n_con = 10)
         for i_ϕ in 1:N_ϕ
             #If the constraint never binds don't need extra grid points
             if c_grid[s, i_ϕ, 1] == -Inf
-                cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, n_con + 1:end], c_grid[s , i_ϕ, n_con + 1:end]; k = k_spline)(a′grid)
+                indx = find(a_grid[s, i_ϕ, :] .< a_min)[end]
+                cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, indx:end], c_grid[s , i_ϕ, indx:end]; k = k_spline)(a′grid)
             #If the constraint binds binds need to use all the grid points
             else
                 cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, :], c_grid[s, i_ϕ, :]; k = k_spline)(a′grid)
@@ -570,7 +570,7 @@ indx = ps["i"]
 
 para = HAmodel()
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-para.T = 5
+para.T = 10_000
 para.agent_num = 100_000
 str = ""
 if indx == 1
@@ -591,15 +591,14 @@ elseif indx == 4
     para.γ_gain = t -> 0.01
 elseif indx == 5
     str = "from_HA/gain_0.005"
-    para.ψ̄ = [3.866160387819722e-5; -0.5747956126764134; -0.4432431327901116]
+    para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
     para.γ_gain = t -> 0.005
 elseif indx == 6
     str = "from_HA/gain_0.01"
-    para.ψ̄ = [3.866160387819722e-5; -0.5747956126764134; -0.4432431327901116]
+    para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
     para.γ_gain = t -> 0.01
 end
 simul_learning(para, π, str)
-
 
 
 
@@ -607,6 +606,7 @@ simul_learning(para, π, str)
 filenames = ["asset", "indi_prod", "belief1", "belief2", "belief3"]
 save_post_time_paths(para, π, filenames; perc = 20)
 =#
+
 
 
 #= Save the IRFs to csv files
@@ -635,12 +635,15 @@ savefig(p2, "../figures/diffs.pdf")
 =#
 
 
+
 #=
 psi = readdlm("../data/zeros_0.005/mean_psi/combined.csv", ',')
 plot(psi, label = "", title = "Gain 0.005", xlabel = "Time", ylabel = "Belief Coefficient")
 plot!(ones(size(psi, 1), 1) .* [3.866160387819722e-5 -0.5747956126764134 -0.4432431327901116], label = "", ls = :dash)
 savefig("../figures/zeros/long_simulation_0.005.pdf")
 =#
+
+
 
 #=
 s = ArgParseSettings()
@@ -652,6 +655,7 @@ s = ArgParseSettings()
 end
 ps = parse_args(s)
 indx = ps["i"]
+
 
 
 srand(1)
@@ -673,6 +677,8 @@ end
 IRFs(para, gain, t_sample, Sim_T)
 get_irf(gain, t_sample, Sim_T)
 =#
+
+
 
 #=
 delete_periods = setdiff(5001:10000, samples)
