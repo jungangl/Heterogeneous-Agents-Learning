@@ -158,11 +158,21 @@ end
 ## Compute the labor supply based on learning
 ## Note that solving for agent's labor supply with endogenous grid cf2
 function indi_labor_supply(para, r, w, ai, si, ψi, x, cf2)
-    @unpack σ, γ, β, χ, A, S, P = para
+    @unpack σ, γ, β, χ, A, S, P, a_min,a_max = para
     ϕi = dot(ψi, x)
     ci = cf2[si](ai, ϕi)
     ni = max(1 - ((w * A[si] * ci ^ (-σ)) / χ) ^ (-1 / γ), 0.0)
     ai′ = (1 + r) * ai + A[si] * w * ni - ci
+    if ai′ < a_min
+        Δ = a_min - ai′
+        ci -= Δ
+        ai′ = a_min
+    end
+    if ai′ > a_max
+        Δ = a_max - ai′
+        ci -= Δ
+        ai′ = a_max
+    end
     return A[si] * ni, ci, ni, ai′
 end
 
