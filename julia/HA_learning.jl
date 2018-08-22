@@ -45,7 +45,7 @@ end
 ## Given r, w, for each s
 ## compute the vector of consumptions chosen by the agent if a′ = a = a_min.
 function compute_cmin2!(para, r, w, cf)
-  @unpack σ, γ, χ, A, S, a_min = para
+  @unpack σ, γ, χ, w̄, r̄, A, S, a_min = para
   for s in 1:S
       function f(logc)
           c = exp.(logc)
@@ -77,13 +77,14 @@ function get_cf2(para, cf, r, w, n_con = 10)
     a_grid = zeros(S, N_ϕ, N_a + n_con)
     c_grid = zeros(S, N_ϕ, N_a + n_con)
     Uc′ = zeros(S)
-    for (i_a, a′) in enumerate(a′grid)
+    for (i_a,a′) in enumerate(a′grid)
         for s′ in 1:S
             Uc′[s′] = (cf[s′](a′)) ^ (-σ)
         end
         for (i_ϕ, ϕ) in enumerate(ϕ_vec)
             for s in 1:S
-                c = (exp(ϕ) * β * (1 + r̄) * dot(P[s, :], Uc′) ) .^ (-1 / σ)
+
+                c = (exp(ϕ) * β * (1 + r̄) * dot(P[s,:],Uc′) ) ^ (-1 / σ)
                 n = max(1 - ((w * A[s] * c ^ (-σ)) / χ) ^ (-1 / γ), 0.)
                 a = (a′ + c - A[s] * w * n) / (1 + r)
                 a_grid[s, i_ϕ, i_a + n_con] = a
@@ -113,8 +114,7 @@ function get_cf2(para, cf, r, w, n_con = 10)
         for i_ϕ in 1:N_ϕ
             #If the constraint never binds don't need extra grid points
             if c_grid[s, i_ϕ, 1] == -Inf
-                indx = find(a_grid[s, i_ϕ, :] .< a_min)[end]
-                cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, indx:end], c_grid[s , i_ϕ, indx:end]; k = k_spline)(a′grid)
+                cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, n_con + 1:end], c_grid[s , i_ϕ, n_con + 1:end]; k = k_spline)(a′grid)
             #If the constraint binds binds need to use all the grid points
             else
                 cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, :], c_grid[s, i_ϕ, :]; k = k_spline)(a′grid)
@@ -124,6 +124,7 @@ function get_cf2(para, cf, r, w, n_con = 10)
     end
     return cf2
 end
+
 
 
 
@@ -348,7 +349,10 @@ function init_data_learning(agent_num, bin_midpts, draws, ψ̄, R̄, ā)
 end
 
 
-
+a_v = readdlm("../data/HA_learning/simulations/from_zeros/gain_0.005/a/34.csv")
+histogram(a_v)
+find(a_v .< 0.)
+minimum(a_v)
 ## Simulate the economy based on learning
 ## 1. νi_t - current marginal utility ν,
 ## 2. ν̄i_t - expected future marginal utility ν̄,
@@ -372,7 +376,7 @@ function simul_learning(para, π, str)
         println(t)
         c, n, a′, ν, ν̄, ν̄c, r, w = TE(para, a, s, ψ, x, cf)
         write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, str)
-        if t == T break end
+        #if t == T break end
         s′ = update_s(para, s, t)
         θ′ = drawθ(θ, σ_ϵ, ρ)
         x′ = [1; log(mean(a′) / ā); log(θ′)]
@@ -523,6 +527,7 @@ function get_irf(gain, t_sample, Sim_T)
     writedlm("../data/irf_$gain/$t_sample/irf/psi.csv", ψ_irf, ',')
     writedlm("../data/irf_$gain/$t_sample/irf/theta.csv", θ_irf, ',')
 end
+
 
 
 ## Plot the impulse response functions
