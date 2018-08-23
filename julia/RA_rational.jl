@@ -19,24 +19,16 @@ mat"""
 
 
 
-
-
-function OLSestimator(y, x)
-    estimate = inv(x'* x) * (x' * y)
-    return estimate
-end
-
-
-
-function construct_ψ(para,ν,a, θ)
+function construct_ψR(para, ν, a, θ)
     T = length(a)
-    x = ones(T-2, 3)
-    y = zeros(T-2)
-    for t in 1:T-2
-        x[t, 2:3] = [log(a[t] / para.ā); log(θ[t+1])]
-        y[t] = log.(ν[t+2] / para.ν̄)
+    x = ones(T - 2, 3)
+    y = zeros(T - 2)
+    for t in 1:T - 2
+        x[t, 2:3] = [log(a[t] / para.ā); log(θ[t + 1])]
+        y[t] = log.(ν[t + 2] / para.ν̄)
     end
-    ψ = OLSestimator(y, x)
+    ψ = inv(x'* x) * (x' * y)
+    R = inv(size(x, 1)) * x' * x
     return ψ
 end
 

@@ -114,10 +114,22 @@ function get_cf2(para, cf, r, w, n_con = 10)
         for i_ϕ in 1:N_ϕ
             #If the constraint never binds don't need extra grid points
             if c_grid[s, i_ϕ, 1] == -Inf
-                cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, n_con + 1:end], c_grid[s , i_ϕ, n_con + 1:end]; k = k_spline)(a′grid)
+                try
+                    cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, n_con + 1:end], c_grid[s , i_ϕ, n_con + 1:end]; k = k_spline)(a′grid)
+                catch err
+                    if isa(err, LoadError)
+                        cvec[:, i_ϕ] .= Spline1D(sort(a_grid[s, i_ϕ, n_con + 1:end]), sort(c_grid[s , i_ϕ, n_con + 1:end]); k = k_spline)(a′grid)
+                    end
+                end
             #If the constraint binds binds need to use all the grid points
             else
-                cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, :], c_grid[s, i_ϕ, :]; k = k_spline)(a′grid)
+                try
+                    cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, :], c_grid[s, i_ϕ, :]; k = k_spline)(a′grid)
+                catch err
+                    if isa(err, LoadError)
+                        cvec[:, i_ϕ] .= Spline1D(sort(a_grid[s, i_ϕ, :]), sort(c_grid[s, i_ϕ, :]); k = k_spline)(a′grid)
+                    end
+                end
             end
         end
         cf2[s] = Spline2D(a′grid, ϕ_vec, cvec)

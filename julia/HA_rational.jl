@@ -4,7 +4,8 @@
 
 function OLSestimator(y, x)
     estimate = inv(x'* x) * (x' * y)
-    return estimate
+    R = inv(size(x, 1)) * x' * x
+    return estimate, R
 end
 
 
@@ -227,9 +228,9 @@ function solve_transition(para)
     res = nlsolve(df,initial_k)
     k_trans = res.zero::Vector{Float64}
     =#
-    coeffs = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
+    coeffs, R = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     Ct, Nt, Kt = compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
-    return k_trans, coeffs, Ct, Nt, Kt
+    return k_trans, coeffs, R, Ct, Nt, Kt
 end
 
 
@@ -257,13 +258,18 @@ function compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     end
     # Regressing for each bin
     coeffs_vec = zeros(3, size(logν̂t, 1))
+    R_vec = zeros(3, 3, size(logν̂t, 1))
     for indx in 1:size(logν̂t, 1)
         LHS = logν̂t[indx, 2:end]
         RHS = [ones(T) log.((Kt / K̄))[1:T] log.(θt)[1:T]]
-        coeffs_vec[:, indx] = OLSestimator(LHS, RHS)
+        coeffs_vec[:, indx], R_vec[:, :, indx] = OLSestimator(LHS, RHS)
     end
     coeffs = [coeffs_vec[i, :]' * π̄ for i in 1:3]
-    return coeffs
+    R = zeros(3, 3)
+    for i in 1:size(logν̂t, 1)
+        R = R .+ R_vec[:, :, indx] * π̄[i]
+    end
+    return coeffs, R
 end
 
 
@@ -300,6 +306,7 @@ end
 
 
 para = HAmodel()
-k_trans, coeffs, Ct, Nt, Kt = solve_transition(para)
+k_trans, coeffs, R, Ct, Nt, Kt = solve_transition(para)
 writedlm("../data/HA_rational/psi.csv", coeffs, ',')
+writedlm("../data/HA_rational/R.csv", R, ',')
 #writedlm("../data/HA_rational//k_trans.csv", k_trans, ',')
