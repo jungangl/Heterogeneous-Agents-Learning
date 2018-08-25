@@ -3,12 +3,13 @@ using ArgParse
 
 
 function combine_csv(path, file)
-    width = size(readdlm("../data/$path/$file/1.csv", ','), 2)
+    dir = "../data/HA_learning/simulations/$path/$file"
+    width = size(readdlm("$dir/1.csv", ','), 2)
     var = zeros(10_000, width)
     for t in 1:10_000
-        var[t, :] = readdlm("../data/$path/$file/$t.csv", ',')
+        var[t, :] = readdlm("$dir/$t.csv", ',')
     end
-    writedlm("../data/$path/$file/combined.csv", var, ',')
+    writedlm("$dir/combined.csv", var, ',')
 end
 
 
@@ -37,8 +38,9 @@ ps = parse_args(s)
 i = ps["i"]
 
 
-paths = ["zeros_0.005", "steadystates_0.005"]
-files = ["mean_s", "mean_psi", "mean_nu_bar_c", "mean_nu_bar", "mean_nu", "mean_n", "mean_c", "mean_a"]
+paths = ["from_zeros/gain_0.005", "from_zeros/gain_0.01", "from_RA/gain_0.005", "from_RA/gain_0.01", "from_HA/gain_0.005", "from_HA/gain_0.01"]
+files = ["mean_s", "mean_psi", "mean_nu_bar_c", "mean_nu_bar", "mean_nu", "mean_n", "mean_c", "mean_a", "w", "theta", "r"]
+total_i = length(paths) * length(files)
 N = length(files)
 comp1, comp2 = dim1to2(i, N)
 combine_csv(paths[comp1], files[comp2])

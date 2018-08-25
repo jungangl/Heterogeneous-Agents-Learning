@@ -4,13 +4,13 @@ using NLsolve, Dierckx, Plots, Distributions, ArgParse
     ## Fundamental paramters
     σ::Float64 = 2.
     γ::Float64 = 2.
-    β::Float64 = 0.9819480641446697
+    β::Float64 = 0.9819149759880317
     ρ::Float64 = 0.95
     σ_ϵ::Float64 = 0.007
     K2Y::Float64 = 10.26
     α::Float64 = 0.36
     δ::Float64 = 0.025
-    χ::Float64 = 1.2943285641437323
+    χ::Float64 = 1.293514964597886
     γ_gain::Function  = t -> 0.02
     ## Steady state values
     ā::Float64 = 14.16447244048578
@@ -22,7 +22,7 @@ using NLsolve, Dierckx, Plots, Distributions, ArgParse
     P::Matrix{Float64} = mc.p
     A::Vector{Float64} = exp.(mc.state_values)
     S::Int64 = length(A)
-    N_ϕ::Int64 = 100
+    N_ϕ::Int64 = 50
     ## Environment variables
     a_min::Float64 = 0.
     a_max::Float64 = 300.
@@ -39,6 +39,7 @@ using NLsolve, Dierckx, Plots, Distributions, ArgParse
     R̄::Matrix{Float64} = [ 1.0000000000   -0.000916309    -0.000362956;
                           -0.000916309     0.00120064      0.000473709;
                           -0.000362956     0.000473709     0.000482302]
+    path::String = "from_zeros/gain_0.005"
 end
 
 
@@ -151,12 +152,10 @@ function get_cf(para)
     compute_cmin!(para)
     @unpack r̄, w̄, a_min, a_max, S, A, k_spline = para
     ## Set more curvature when in the lower range of a′grid
-    a′grid = vcat(
-             linspace(a_min, a_min + 2, 20),
-             linspace(a_min + 2, a_max, 80)[2:end]
-             )
+    a′grid = vcat(linspace(a_min, a_min + 2, Int(round((a_max - a_min) * 0.2))),
+                  linspace(a_min + 2, a_max, Int(round(a_max - a_min) * 0.8))[2:end])
+    N = length(a′grid)
     ## Initialize the consumption function
-    N = 100
     a_mat = zeros(S, N)
     c_mat = zeros(S, N)
     cf = Vector{Spline1D}(S)
@@ -320,11 +319,11 @@ end
 
 ## Calibrating for χ and β, targeting K2Y ratio and average working hours
 function calibrate_stationary(para)
-    @unpack α, K2Y, n̄, β, χ = para
+    @unpack α, K2Y, n̄ = para
     K2EN = (K2Y) ^ (1 / (1 - α))
-    #res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [β; χ]; inplace = false)
-    #para.β, para.χ = res.zero
-    diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid = stationary_resid([β, χ], α, K2Y, n̄, K2EN, para)
+    res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
+    para.β, para.χ = res.zero
+    diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid = stationary_resid([para.β, para.χ], α, K2Y, n̄, K2EN, para)
     return para, π, K2EN, ϵn_grid, n_grid, a_grid
 end
 
@@ -342,8 +341,8 @@ function wealth_dist(para, π)
     p2 = scatter(agrid[6:end], πgrid[6:end], label = "a", title = "wealth distribution from a = $(agrid[6])", grid = false)
     writedlm("../data/HA_stationary/dist_over_a/a.csv", agrid, ',')
     writedlm("../data/HA_stationary/dist_over_a/pi.csv", πgrid, ',')
-    savefig(p1, "../figures/HA_stationary/wealth_low.pdf")
-    savefig(p2, "../figures/HA_stationary/wealth_high.pdf")
+    savefig(p1, "../figures/HA_stationary/dist_over_a/wealth_low.pdf")
+    savefig(p2, "../figures/HA_stationary/dist_over_a/wealth_high.pdf")
 end
 
 
@@ -364,6 +363,7 @@ end
 
 
 #=
+wealth_dist(para, π)
 p_c, p_n, p_aprime = plot_policies(para)
 savefig(p_c, "../figures/HA_stationary/policies/c.pdf")
 savefig(p_n, "../figures/HA_stationary/policies/n.pdf")

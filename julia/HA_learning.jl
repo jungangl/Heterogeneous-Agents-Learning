@@ -19,6 +19,7 @@ function write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, str)
     writedlm("../data/HA_learning/simulations/$str/mean_nu_bar_c/$t.csv", mean(ν̄c), ',')
     writedlm("../data/HA_learning/simulations/$str/psi/$t.csv", ψ, ',')
     writedlm("../data/HA_learning/simulations/$str/mean_psi/$t.csv", mean(ψ, 1), ',')
+    writedlm("../data/HA_learning/simulations/$str/median_psi/$t.csv", median(ψ, 1), ',')
     writedlm("../data/HA_learning/simulations/$str/r/$t.csv", r, ',')
     writedlm("../data/HA_learning/simulations/$str/R_cov/$t.csv", R, ',')
     writedlm("../data/HA_learning/simulations/$str/s/$t.csv", s, ',')
@@ -63,15 +64,15 @@ end
 ## Use 2D-interpolation to approximate the consumption function cf2[s](a, ϕ)
 ## The grid for the 2D-interpolation is
 ## a_vec =  linspace(a_min, a_max, N) and ϕ_vec
-function get_cf2(para, cf, r, w, n_con = 10)
+function get_cf2(para, cf, r, w)
+    n_con = 10
     compute_cmin2!(para, r, w, cf)
     @unpack σ, γ, β, χ, r̄, w̄, P, A, S, c_min2, k_spline = para
-    @unpack a_min, a_max, ϕ_min, ϕ_max, N_ϕ = para
-
+    @unpack a_min, a_max, ϕ_min, ϕ_max, N_ϕ, path = para
     ϕ_vec = linspace(ϕ_min, ϕ_max, N_ϕ)
     cf2 = Spline2D[]
-    a′grid = vcat(linspace(a_min, a_min + 2, 20),
-                  linspace(a_min + 2, a_max, 80)[2:end])
+    a′grid = vcat(linspace(a_min, a_min + 2, Int(round((a_max - a_min) * 0.2))),
+                  linspace(a_min + 2, a_max, Int(round(a_max - a_min) * 0.8))[2:end])
     N_a = length(a′grid)
     #preallocate for speed
     a_grid = zeros(S, N_ϕ, N_a + n_con)
@@ -114,11 +115,17 @@ function get_cf2(para, cf, r, w, n_con = 10)
         for i_ϕ in 1:N_ϕ
             #If the constraint never binds don't need extra grid points
             if c_grid[s, i_ϕ, 1] == -Inf
+                start_i = find(a_grid[s, i_ϕ, :] .< a_min)[end]
                 try
-                    cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, n_con + 1:end], c_grid[s , i_ϕ, n_con + 1:end]; k = k_spline)(a′grid)
+                    cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, start_i:end], c_grid[s , i_ϕ, start_i:end]; k = k_spline)(a′grid)
                 catch err
                     if isa(err, LoadError)
-                        cvec[:, i_ϕ] .= Spline1D(sort(a_grid[s, i_ϕ, n_con + 1:end]), sort(c_grid[s , i_ϕ, n_con + 1:end]); k = k_spline)(a′grid)
+                        sort_indx = sortperm(a_grid[s, i_ϕ, start_i:end])
+                        x_vec = (a_grid[s, i_ϕ, start_i:end])[sort_indx]
+                        y_vec = (c_grid[s , i_ϕ, start_i:end])[sort_indx]
+                        cvec[:, i_ϕ] .= Spline1D(x_vec, y_vec; k = k_spline)(a′grid)
+                        output = vcat([r w], [s ϕ_vec[i_ϕ]], hcat(a_grid[s, i_ϕ, start_i:end], c_grid[s , i_ϕ, start_i:end]))
+                        writedlm("../data/HA_learning/simulations/$path/spline/$(now()).csv", output, ',')
                     end
                 end
             #If the constraint binds binds need to use all the grid points
@@ -136,7 +143,6 @@ function get_cf2(para, cf, r, w, n_con = 10)
     end
     return cf2
 end
-
 
 
 
@@ -371,17 +377,14 @@ function init_data_learning(agent_num, bin_midpts, draws, ψ̄, R̄, ā)
 end
 
 
-a_v = readdlm("../data/HA_learning/simulations/from_zeros/gain_0.005/a/34.csv")
-histogram(a_v)
-find(a_v .< 0.)
-minimum(a_v)
+
 ## Simulate the economy based on learning
 ## 1. νi_t - current marginal utility ν,
 ## 2. ν̄i_t - expected future marginal utility ν̄,
 ## 3. ν̄ci_t - current marginal utility in steady state ν̄c
 ## 4. x_t - vector of aggregate states [1; log(mean(a) / ā); log(θ_t[t])]
-function simul_learning(para, π, str)
-    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄ = para
+function simul_learning(para, π)
+    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄, path = para
     ## Initialize functions
     cf = get_cf(para)
     bin_midpts = get_bins(a_min, a_max, N)
@@ -397,8 +400,8 @@ function simul_learning(para, π, str)
     for t in 1:T
         println(t)
         c, n, a′, ν, ν̄, ν̄c, r, w = TE(para, a, s, ψ, x, cf)
-        write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, str)
-        #if t == T break end
+        write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, path)
+        if t == T break end
         s′ = update_s(para, s, t)
         θ′ = drawθ(θ, σ_ϵ, ρ)
         x′ = [1; log(mean(a′) / ā); log(θ′)]
@@ -599,33 +602,32 @@ para = HAmodel()
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 para.T = 10_000
 para.agent_num = 100_000
-str = ""
 if indx == 1
-    str = "from_zeros/gain_0.005"
+    para.path = "from_zeros/gain_0.005"
     para.ψ̄ = zeros(3)
     para.γ_gain = t -> 0.005
 elseif indx == 2
-    str = "from_zeros/gain_0.01"
+    para.path = "from_zeros/gain_0.01"
     para.ψ̄ = zeros(3)
     para.γ_gain = t -> 0.01
 elseif indx == 3
-    str = "from_RA/gain_0.005"
+    para.path = "from_RA/gain_0.005"
     para.ψ̄ = [-0.00131466; -0.765091; -0.655608]
     para.γ_gain = t -> 0.005
 elseif indx == 4
-    str = "from_RA/gain_0.01"
+    para.path = "from_RA/gain_0.01"
     para.ψ̄ = [-0.00131466; -0.765091; -0.655608]
     para.γ_gain = t -> 0.01
 elseif indx == 5
-    str = "from_HA/gain_0.005"
+    para.path = "from_HA/gain_0.005"
     para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
     para.γ_gain = t -> 0.005
 elseif indx == 6
-    str = "from_HA/gain_0.01"
+    para.path = "from_HA/gain_0.01"
     para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
     para.γ_gain = t -> 0.01
 end
-simul_learning(para, π, str)
+simul_learning(para, π)
 
 
 
@@ -664,10 +666,26 @@ savefig(p2, "../figures/diffs.pdf")
 
 
 #=
-psi = readdlm("../data/zeros_0.005/mean_psi/combined.csv", ',')
-plot(psi, label = "", title = "Gain 0.005", xlabel = "Time", ylabel = "Belief Coefficient")
-plot!(ones(size(psi, 1), 1) .* [3.866160387819722e-5 -0.5747956126764134 -0.4432431327901116], label = "", ls = :dash)
-savefig("../figures/zeros/long_simulation_0.005.pdf")
+start = "from_RA"
+gain = "gain_0.01"
+psi = readdlm("../data/HA_learning/simulations/$start/$gain/median_psi/combined.csv", ',')
+plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "Median Beliefs")
+plot!(ones(size(psi, 1), 1) .* [6.32e-07 -0.618232182 -0.852232561], label = "", ls = :dash)
+savefig("../figures/HA_learning/simulations/median/$(start)_$(gain).pdf")
+=#
+
+
+
+#=
+plot(title = "diff between zeros and RA, gain = 0.01", label = "",
+readdlm("../data/HA_learning/simulations/from_RA/gain_0.01/median_psi/combined.csv", ',') -
+readdlm("../data/HA_learning/simulations/from_zeros/gain_0.01/median_psi/combined.csv", ','))
+savefig("../figures/HA_learning/simulations/diff/RA-zeros_0.01.png")
+
+plot(title = "diff between RA and HA, gain = 0.01", label = "",
+readdlm("../data/HA_learning/simulations/from_HA/gain_0.01/median_psi/combined.csv", ',') -
+readdlm("../data/HA_learning/simulations/from_RA/gain_0.01/median_psi/combined.csv", ','))
+savefig("../figures/HA_learning/simulations/diff/HA-RA_0.01.png")
 =#
 
 
