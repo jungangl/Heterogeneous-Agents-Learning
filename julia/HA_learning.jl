@@ -666,26 +666,26 @@ savefig(p2, "../figures/diffs.pdf")
 
 
 #=
-start = "from_RA"
+start = "from_HA"
 gain = "gain_0.01"
-psi = readdlm("../data/HA_learning/simulations/$start/$gain/median_psi/combined.csv", ',')
-plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "Median Beliefs")
+psi = readdlm("../data/HA_learning/simulations/$start/$gain/mean_psi/combined.csv", ',')
+plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "Mean Beliefs")
 plot!(ones(size(psi, 1), 1) .* [6.32e-07 -0.618232182 -0.852232561], label = "", ls = :dash)
-savefig("../figures/HA_learning/simulations/median/$(start)_$(gain).pdf")
+savefig("../figures/HA_learning/simulations/mean/$(start)_$(gain).pdf")
 =#
 
 
 
 #=
 plot(title = "diff between zeros and RA, gain = 0.01", label = "",
-readdlm("../data/HA_learning/simulations/from_RA/gain_0.01/median_psi/combined.csv", ',') -
-readdlm("../data/HA_learning/simulations/from_zeros/gain_0.01/median_psi/combined.csv", ','))
-savefig("../figures/HA_learning/simulations/diff/RA-zeros_0.01.png")
+readdlm("../data/HA_learning/simulations/from_RA/gain_0.01/mean_psi/combined.csv", ',') -
+readdlm("../data/HA_learning/simulations/from_zeros/gain_0.01/mean_psi/combined.csv", ','))
+savefig("../figures/HA_learning/simulations/diff/mean/RA-zeros_0.01.png")
 
 plot(title = "diff between RA and HA, gain = 0.01", label = "",
-readdlm("../data/HA_learning/simulations/from_HA/gain_0.01/median_psi/combined.csv", ',') -
-readdlm("../data/HA_learning/simulations/from_RA/gain_0.01/median_psi/combined.csv", ','))
-savefig("../figures/HA_learning/simulations/diff/HA-RA_0.01.png")
+readdlm("../data/HA_learning/simulations/from_HA/gain_0.01/mean_psi/combined.csv", ',') -
+readdlm("../data/HA_learning/simulations/from_RA/gain_0.01/mean_psi/combined.csv", ','))
+savefig("../figures/HA_learning/simulations/diff/mean/HA-RA_0.01.png")
 =#
 
 

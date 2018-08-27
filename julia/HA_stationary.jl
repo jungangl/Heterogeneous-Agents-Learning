@@ -346,9 +346,10 @@ function wealth_dist(para, π)
 end
 
 
-
+#=
 para = HAmodel()
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(HAmodel())
+=#
 
 
 
