@@ -39,7 +39,7 @@ using NLsolve, Dierckx, Plots, Distributions, ArgParse
     R̄::Matrix{Float64} = [ 1.0000000000   -0.000916309    -0.000362956;
                           -0.000916309     0.00120064      0.000473709;
                           -0.000362956     0.000473709     0.000482302]
-    path::String = "from_zeros/gain_0.005"
+    path::String = "simulations/from_zeros/gain_0.005"
 end
 
 
