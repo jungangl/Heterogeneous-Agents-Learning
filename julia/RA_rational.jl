@@ -29,7 +29,7 @@ function construct_ψR(para, ν, a, θ)
     end
     ψ = inv(x'* x) * (x' * y)
     R = inv(size(x, 1)) * x' * x
-    return ψ
+    return ψ, R
 end
 
 
@@ -59,9 +59,9 @@ w = readdlm("../data/RA_rational/w.csv", ',')
 
 
 para = RAmodel(T = 100_000)
-ψ = construct_ψ(para,ν,a,θ)
+ψ, R = construct_ψR(para, ν, a, θ)
 #writedlm("../data/RA_rational/psi.csv", ψ, ',')
-
+#writedlm("../data/RA_rational/psi.csv", ψ, ',')
 
 #=
 filenames = ["c", "r", "w", "n", "nu", "theta", "a"]

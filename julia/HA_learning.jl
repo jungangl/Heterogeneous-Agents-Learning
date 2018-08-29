@@ -78,14 +78,14 @@ function get_cf2(para, cf, r, w)
     a_grid = zeros(S, N_ϕ, N_a + n_con)
     c_grid = zeros(S, N_ϕ, N_a + n_con)
     Uc′ = zeros(S)
-    for (i_a,a′) in enumerate(a′grid)
+    for (i_a, a′) in enumerate(a′grid)
         for s′ in 1:S
             Uc′[s′] = (cf[s′](a′)) ^ (-σ)
         end
         for (i_ϕ, ϕ) in enumerate(ϕ_vec)
             for s in 1:S
 
-                c = (exp(ϕ) * β * (1 + r̄) * dot(P[s,:],Uc′) ) ^ (-1 / σ)
+                c = (exp(ϕ) * β * (1 + r̄) * dot(P[s,:], Uc′) ) ^ (-1 / σ)
                 n = max(1 - ((w * A[s] * c ^ (-σ)) / χ) ^ (-1 / γ), 0.)
                 a = (a′ + c - A[s] * w * n) / (1 + r)
                 a_grid[s, i_ϕ, i_a + n_con] = a
@@ -383,7 +383,7 @@ end
 ## 2. ν̄i_t - expected future marginal utility ν̄,
 ## 3. ν̄ci_t - current marginal utility in steady state ν̄c
 ## 4. x_t - vector of aggregate states [1; log(mean(a) / ā); log(θ_t[t])]
-function simul_learning(para, π)
+function simul_learning(para, π, keep_const)
     @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄, path = para
     ## Initialize functions
     cf = get_cf(para)
@@ -397,7 +397,6 @@ function simul_learning(para, π)
     The belief subscript indicates the time when the belief is formed.
     The belief is being used the period after it is formed.
     For example ψ_1 is the belief formed at end time 1 but used at the beginning of time 2 =#
-    keep_const = true
     for t in 1:T
         println(t)
         c, n, a′, ν, ν̄, ν̄c, r, w = TE(para, a, s, ψ, x, cf)
@@ -622,17 +621,38 @@ end
 
 
 
+## Compute the coefficients from simulating learning with holding the beliefs at HA_rational
+function compute_coeffs(para)
+    @unpack T, agent_num, path, ā = para
+    coeffs = zeros(agent_num, 3)
+    ν = zeros(T, agent_num)
+    ν̄c = zeros(T, agent_num)
+    a, θ = [zeros(T) for _ in 1:2]
+    for t in 1:T
+        ν[t, :] = readdlm("../data/HA_learning/$(path)/nu/$(t).csv", ',')
+        ν̄c[t, :] = readdlm("../data/HA_learning/$(path)/nu_bar_c/$(t).csv", ',')
+        a[t] = readdlm("../data/HA_learning/$(path)/mean_a/$(t).csv", ',')[1]
+        θ[t] = readdlm("../data/HA_learning/$(path)/theta/$(t).csv", ',')[1]
+    end
+    RHS = [ones(T) log.((a / ā)) log.(θ)][1:T - 1, :]
+    for i in 1:agent_num
+        LHS = log.(ν[2:T, i] ./ ν̄c[2:T, i])
+        coeffs[i, :] = inv(RHS' * RHS) * (RHS' * LHS)
+    end
+    writedlm("../data/HA_learning/$(path)/coeff/all_agents.csv", coeffs, ',')
+end
+
+
 #=
 ####################################################################################################
 #                            Long simulations with learning
 ####################################################################################################
-## indx going from 1 to 6
 s = ArgParseSettings()
 @add_arg_table s begin
     "i"
         arg_type = Int
         required = true
-        help = "index"
+        help = "indx going from 1 to 6"
 end
 ps = parse_args(s)
 indx = ps["i"]
@@ -668,7 +688,8 @@ elseif indx == 6
     para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
     para.γ_gain = t -> 0.01
 end
-simul_learning(para, π)
+keep_const = false
+simul_learning(para, π, keep_const)
 
 
 
@@ -697,17 +718,16 @@ savefig("../figures/HA_learning/simulations/diff/mean/HA-RA_0.01.png")
 
 
 
-
+#=
 ####################################################################################################
 #                            Long simulations with learning
 ####################################################################################################
-## indx going from 1 to 1000
 s = ArgParseSettings()
 @add_arg_table s begin
     "i"
         arg_type = Int
         required = true
-        help = "index"
+        help = "indx going from 1 to 1000"
 end
 ps = parse_args(s)
 indx = ps["i"]
@@ -743,6 +763,70 @@ plot_vec = plot_irf_confidence(α, gain, Sim_T, names)
 for (i, p) in enumerate(plot_vec)
     savefig(p, "../figures/HA_learning/IRFs/$gain/$(names[i]).png")
 end
+=#
+
+
+
+
+####################################################################################################
+#                         Check learning with constant beliefs set at HA rational
+####################################################################################################
+s = ArgParseSettings()
+@add_arg_table s begin
+    "i"
+        arg_type = Int
+        required = true
+        help = "indx going from 1 to 2"
+end
+ps = parse_args(s)
+indx = ps["i"]
+
+
+
+para = HAmodel()
+para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
+para.T = 10_000
+para.agent_num = 100_000
+if indx == 1
+    para.path = "simulations/keep_const/gain_0.005"
+    para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
+    para.γ_gain = t -> 0.005
+elseif indx == 2
+    para.path = "simulations/keep_const/gain_0.01"
+    para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
+    para.γ_gain = t -> 0.01
+end
+keep_const = true
+simul_learning(para, π, keep_const)
+compute_coeffs(para)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

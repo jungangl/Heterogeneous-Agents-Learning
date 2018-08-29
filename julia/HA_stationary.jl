@@ -321,8 +321,8 @@ end
 function calibrate_stationary(para)
     @unpack α, K2Y, n̄ = para
     K2EN = (K2Y) ^ (1 / (1 - α))
-    res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
-    para.β, para.χ = res.zero
+    #res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
+    #para.β, para.χ = res.zero
     diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid = stationary_resid([para.β, para.χ], α, K2Y, n̄, K2EN, para)
     return para, π, K2EN, ϵn_grid, n_grid, a_grid
 end
