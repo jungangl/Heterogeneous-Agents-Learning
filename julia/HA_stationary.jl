@@ -333,7 +333,6 @@ function stat_dist(para::HAmodel, k::Float64)
         π_new = (π' * H)'
         diff = norm(π_new - π, Inf)
         π = π_new
-        println(diff)
     end
     return π, ϵn_grid, n_grid, a_grid
 end
