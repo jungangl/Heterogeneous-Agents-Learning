@@ -1,16 +1,49 @@
 using QuantEcon, Parameters, CSV, StatsBase
 using NLsolve, Dierckx, Plots, Distributions, ArgParse
+using FastGaussQuadrature
+
+function computeProductivityProcess(ρ_p,σ_p,σ_e,Np,Nt)
+    """
+    Computes productivity process by approximating AR(1) + iid shock
+    """
+    mc = rouwenhorst(Np, ρ_p, σ_p) #From
+    P1 = mc.p
+    e1 = mc.state_values
+
+    nodes,weights = gausshermite(Nt)
+
+    P2 = repmat(weights'/sqrt(π),Nt) #adjust weights by sqrt(π)
+    e2 = sqrt(2)*σ_e*nodes
+
+    P = kron(P1,P2) #kron combines matrixies multiplicatively
+    e = kron(e1,ones(Nt)) + kron(ones(Np),e2) # e is log productivity
+    return MarkovChain(P,e)
+end
+
+function construct_agrid(a_min,a_max,Na,curv=1.7)
+    """
+    Computes agrid with Na points with more mass near borrowing constraint.
+    """
+    a_grid = zeros(Na)
+    a_grid[1] = a_min
+    for i in 2:Na
+        a_grid[i] = a_min  + (a_max-a_min)*((i-1.0)/(Na-1.0)) ^ curv
+    end
+    return a_grid
+end
+
+
 @with_kw type HAmodel
     ## Fundamental paramters
     σ::Float64 = 2.
     γ::Float64 = 2.
-    β::Float64 = 0.9819149759880317
+    β::Float64 = 0.9817232017253373#0.9819149759880317
     ρ::Float64 = 0.95
     σ_ϵ::Float64 = 0.007
     K2Y::Float64 = 10.26
     α::Float64 = 0.36
     δ::Float64 = 0.025
-    χ::Float64 = 1.293514964597886
+    χ::Float64 = 1.0933191294158184#1.293514964597886
     γ_gain::Function  = t -> 0.02
     ## Steady state values
     ā::Float64 = 14.16447244048578
@@ -18,7 +51,7 @@ using NLsolve, Dierckx, Plots, Distributions, ArgParse
     w̄::Float64 = (1 - α) * (K2Y) ^ (α / (1 - α))
     n̄::Float64 = 1/3
     ## MarkovChain for the state variable s
-    mc::MarkovChain = rouwenhorst(11, 0.9923, 0.0983)
+    mc::MarkovChain = computeProductivityProcess(0.9923,0.0983,sqrt(0.053),7,3)#rouwenhorst(11, 0.9923, 0.0983)
     P::Matrix{Float64} = mc.p
     A::Vector{Float64} = exp.(mc.state_values)
     S::Int64 = length(A)
@@ -26,6 +59,7 @@ using NLsolve, Dierckx, Plots, Distributions, ArgParse
     ## Environment variables
     a_min::Float64 = 0.
     a_max::Float64 = 300.
+    Na::Int64 = 150 #number of asset grid points for spline
     ϕ_min::Float64 = 0.
     ϕ_max::Float64 = 0.
     N::Int64 = 1500
@@ -150,10 +184,9 @@ end
 ## Function that computes the fixed point for the consumption function
 function get_cf(para)
     compute_cmin!(para)
-    @unpack r̄, w̄, a_min, a_max, S, A, k_spline = para
+    @unpack r̄, w̄, a_min, a_max,Na, S, A, k_spline = para
     ## Set more curvature when in the lower range of a′grid
-    a′grid = vcat(linspace(a_min, a_min + 2, Int(round((a_max - a_min) * 0.2))),
-                  linspace(a_min + 2, a_max, Int(round(a_max - a_min) * 0.8))[2:end])
+    a′grid = construct_agrid(a_min,a_max,Na)
     N = length(a′grid)
     ## Initialize the consumption function
     a_mat = zeros(S, N)
@@ -170,6 +203,10 @@ function get_cf(para)
         cf[s] = Spline1D(a_mat[s, :], c_mat[s, :]; k = k_spline)
     end
     ## Solve for the fixed point of the consumption function
+    oldk = para.k_spline
+    para.k_spline   = 1
+    cf = solve_c(cf, a′grid, para)
+    para.k_spline   = oldk
     cf = solve_c(cf, a′grid, para)
     return cf
 end
@@ -296,6 +333,7 @@ function stat_dist(para::HAmodel, k::Float64)
         π_new = (π' * H)'
         diff = norm(π_new - π, Inf)
         π = π_new
+        println(diff)
     end
     return π, ϵn_grid, n_grid, a_grid
 end

@@ -68,11 +68,11 @@ function get_cf2(para, cf, r, w)
     n_con = 10
     compute_cmin2!(para, r, w, cf)
     @unpack σ, γ, β, χ, r̄, w̄, P, A, S, c_min2, k_spline = para
-    @unpack a_min, a_max, ϕ_min, ϕ_max, N_ϕ, path = para
+    @unpack a_min, a_max, Na, ϕ_min, ϕ_max, N_ϕ, path = para
     ϕ_vec = linspace(ϕ_min, ϕ_max, N_ϕ)
     cf2 = Spline2D[]
-    a′grid = vcat(linspace(a_min, a_min + 2, Int(round((a_max - a_min) * 0.2))),
-                  linspace(a_min + 2, a_max, Int(round(a_max - a_min) * 0.8))[2:end])
+    a′grid = construct_agrid(a_min,a_max,Na)
+    
     N_a = length(a′grid)
     #preallocate for speed
     a_grid = zeros(S, N_ϕ, N_a + n_con)

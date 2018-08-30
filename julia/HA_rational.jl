@@ -1,3 +1,4 @@
+addprocs(25)
 @everywhere include("HA_stationary.jl")
 
 
@@ -79,11 +80,10 @@ end
 
 
 @everywhere function get_cft(para, T, rt, wt, cf_ss)
-    @unpack S, a_min, a_max = para
+    @unpack S, a_min, a_max, Na = para
     cft = Matrix{Dierckx.Spline1D}(S, T + 1) # running from time 0 to T
     cft[:, end] = cf_ss
-    a′grid = vcat(linspace(a_min, a_min+ 2 , 20),
-                  linspace(a_min + 2, a_max, 80)[2:end])
+    a′grid = construct_agrid(a_min,a_max,Na)
     # backwards compute the policies
     for τ in 0:T - 1
         t = T - τ
@@ -173,7 +173,7 @@ end
 function solve_transition(para)
     @unpack a_min, a_max, ρ, α, δ, S = para
     T = 300
-    lnθ₀ = para.σ_ϵ
+    lnθ₀ = 1*para.σ_ϵ
     lnθt = [lnθ₀ * ρ .^ (t - 1) for t in 1:T + 1]
     θt = exp.(lnθt) # running from time 0 to T
     para, π̄, k̄, n̄grid,_, agrid = calibrate_stationary(para)
@@ -220,14 +220,14 @@ function solve_transition(para)
         end
         F[:] = results[:,1];
     end
-    k_trans = readdlm("../data/HA_rational/k_trans.csv", ',')
-    #=
-    initial_k = ones(T) * k̄
-    initial_F = zeros(T)
-    df = OnceDifferentiable(f!,j!,fj!,initial_k,initial_F)
-    res = nlsolve(df,initial_k)
-    k_trans = res.zero::Vector{Float64}
-    =#
+    k_trans = readdlm("../data/HA_rational/k_trans1sd.csv", ',')
+
+    #initial_k = ones(T) * k̄
+    #initial_F = zeros(T)
+    #df = OnceDifferentiable(f!,j!,fj!,initial_k,initial_F)
+    #res = nlsolve(df,initial_k)
+    #k_trans = res.zero::Vector{Float64}
+
     coeffs, R = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     Ct, Nt, Kt = compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     return k_trans, coeffs, R, Ct, Nt, Kt
@@ -267,7 +267,7 @@ function compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     coeffs = [coeffs_vec[i, :]' * π̄ for i in 1:3]
     R = zeros(3, 3)
     for i in 1:size(logν̂t, 1)
-        R = R .+ R_vec[:, :, indx] * π̄[i]
+        R = R .+ R_vec[:, :, i] * π̄[i]
     end
     return coeffs, R
 end
@@ -307,6 +307,6 @@ end
 
 para = HAmodel()
 k_trans, coeffs, R, Ct, Nt, Kt = solve_transition(para)
-writedlm("../data/HA_rational/psi.csv", coeffs, ',')
-writedlm("../data/HA_rational/R.csv", R, ',')
-#writedlm("../data/HA_rational//k_trans.csv", k_trans, ',')
+writedlm("../data/HA_rational/psi1sdtest.csv", coeffs, ',')
+writedlm("../data/HA_rational/R1sdtest.csv", R, ',')
+writedlm("../data/HA_rational/k_trans1sdtest.csv", k_trans, ',')
