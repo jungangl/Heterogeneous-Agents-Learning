@@ -629,6 +629,7 @@ function compute_coeffs(para)
     ν̄c = zeros(T, agent_num)
     a, θ = [zeros(T) for _ in 1:2]
     for t in 1:T
+        println("t = $t")
         ν[t, :] = readdlm("../data/HA_learning/$(path)/nu/$(t).csv", ',')
         ν̄c[t, :] = readdlm("../data/HA_learning/$(path)/nu_bar_c/$(t).csv", ',')
         a[t] = readdlm("../data/HA_learning/$(path)/mean_a/$(t).csv", ',')[1]
@@ -771,31 +772,12 @@ end
 ####################################################################################################
 #                         Check learning with constant beliefs set at HA rational
 ####################################################################################################
-s = ArgParseSettings()
-@add_arg_table s begin
-    "i"
-        arg_type = Int
-        required = true
-        help = "indx going from 1 to 2"
-end
-ps = parse_args(s)
-indx = ps["i"]
-
-
-
 para = HAmodel()
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-para.T = 10_000
+para.T = 4_000
 para.agent_num = 100_000
-if indx == 1
-    para.path = "simulations/keep_const/gain_0.005"
-    para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
-    para.γ_gain = t -> 0.005
-elseif indx == 2
-    para.path = "simulations/keep_const/gain_0.01"
-    para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
-    para.γ_gain = t -> 0.01
-end
+para.path = "simulations/keep_const"
+para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
 keep_const = true
 simul_learning(para, π, keep_const)
 compute_coeffs(para)
