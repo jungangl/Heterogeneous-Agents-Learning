@@ -2,32 +2,36 @@ using QuantEcon, Parameters, CSV, StatsBase
 using NLsolve, Dierckx, Plots, Distributions, ArgParse
 using FastGaussQuadrature
 
-function computeProductivityProcess(ρ_p,σ_p,σ_e,Np,Nt)
-    """
-    Computes productivity process by approximating AR(1) + iid shock
-    """
-    mc = rouwenhorst(Np, ρ_p, σ_p) #From
-    P1 = mc.p
-    e1 = mc.state_values
 
-    nodes,weights = gausshermite(Nt)
 
-    P2 = repmat(weights'/sqrt(π),Nt) #adjust weights by sqrt(π)
-    e2 = sqrt(2)*σ_e*nodes
+## Computes productivity process by approximating AR(1) + iid shock
+function computeProductivityProcess(ρ_p, σ_p, σ_e, Np, Nt, Ns, with_iid)
+    if with_iid
+        mc = rouwenhorst(Np, ρ_p, σ_p)::QuantEcon.MarkovChain{Float64,Array{Float64,2},StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}}
+        P1 = mc.p
+        e1 = mc.state_values
 
-    P = kron(P1,P2) #kron combines matrixies multiplicatively
-    e = kron(e1,ones(Nt)) + kron(ones(Np),e2) # e is log productivity
-    return MarkovChain(P,e)
+        nodes, weights = gausshermite(Nt)::Tuple{Array{Float64,1},Array{Float64,1}}
+
+        P2 = repmat(weights' / sqrt(pi), Nt) #adjust weights by sqrt(π)
+        e2 = sqrt(2) * σ_e * nodes
+
+        P = kron(P1, P2) #kron combines matrixies multiplicatively
+        e = kron(e1, ones(Nt)) + kron(ones(Np), e2) # e is log productivity
+        return MarkovChain(P, e)
+    else
+        return rouwenhorst(Ns, ρ_p, σ_p)::QuantEcon.MarkovChain{Float64,Array{Float64,2},StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}}
+    end
 end
 
-function construct_agrid(a_min,a_max,Na,curv=1.7)
-    """
-    Computes agrid with Na points with more mass near borrowing constraint.
-    """
+
+
+## Computes agrid with Na points with more mass near borrowing constraint.
+function construct_agrid(a_min, a_max, Na, curv = 1.7)
     a_grid = zeros(Na)
     a_grid[1] = a_min
     for i in 2:Na
-        a_grid[i] = a_min  + (a_max-a_min)*((i-1.0)/(Na-1.0)) ^ curv
+        a_grid[i] = a_min  + (a_max - a_min) * ((i - 1.0) / (Na - 1.0)) ^ curv
     end
     return a_grid
 end
@@ -35,15 +39,16 @@ end
 
 @with_kw type HAmodel
     ## Fundamental paramters
+    with_iid::Bool = true
     σ::Float64 = 2.
     γ::Float64 = 2.
-    β::Float64 = 0.9817232017253373#0.9819149759880317
+    β::Float64 = if with_iid 0.9817232017253373 else 0.9819212869380729 end
     ρ::Float64 = 0.95
     σ_ϵ::Float64 = 0.007
     K2Y::Float64 = 10.26
     α::Float64 = 0.36
     δ::Float64 = 0.025
-    χ::Float64 = 1.0933191294158184#1.293514964597886
+    χ::Float64 = if with_iid 1.0933191294158184 else 1.293710294268282 end
     γ_gain::Function  = t -> 0.02
     ## Steady state values
     ā::Float64 = 14.16447244048578
@@ -51,7 +56,13 @@ end
     w̄::Float64 = (1 - α) * (K2Y) ^ (α / (1 - α))
     n̄::Float64 = 1/3
     ## MarkovChain for the state variable s
-    mc::MarkovChain = computeProductivityProcess(0.9923,0.0983,sqrt(0.053),7,3)#rouwenhorst(11, 0.9923, 0.0983)
+    ρ_p::Float64 = 0.9923 # persistence
+    σ_p::Float64 = 0.0983 # permanent shock standard deviation
+    σ_e::Float64 = sqrt(0.053) # transitory shock standard deviation
+    Np::Int64 = 7 # number of states for permanent shocks
+    Nt::Int64 = 3 # number of states for transitory shocks
+    Ns::Int64 = 11 # number of states without iid shocks
+    mc::MarkovChain = computeProductivityProcess(ρ_p, σ_p, σ_e, Np, Nt, Ns, with_iid)
     P::Matrix{Float64} = mc.p
     A::Vector{Float64} = exp.(mc.state_values)
     S::Int64 = length(A)
@@ -74,6 +85,7 @@ end
                           -0.000916309     0.00120064      0.000473709;
                           -0.000362956     0.000473709     0.000482302]
     path::String = "simulations/from_zeros/gain_0.005"
+    with::String = if with_iid "with_iid" else "without_iid" end
 end
 
 
@@ -368,6 +380,7 @@ end
 
 ## Plot the wealth distribution over a, make sure there is no bunching at a_max
 function wealth_dist(para, π)
+    @unpack with = para
     agrid = collect(get_bins(para.a_min, para.a_max, para.N))
     πgrid = zeros(length(agrid))
     for k in 1:length(π)
@@ -376,16 +389,17 @@ function wealth_dist(para, π)
     end
     p1 = scatter(agrid[1:5], πgrid[1:5], label = "a", grid = false, title = "wealth distribtion for a in ($(agrid[1]), $(round(agrid[5], 2)))")
     p2 = scatter(agrid[6:end], πgrid[6:end], label = "a", title = "wealth distribution from a = $(agrid[6])", grid = false)
-    writedlm("../data/HA_stationary/dist_over_a/a.csv", agrid, ',')
-    writedlm("../data/HA_stationary/dist_over_a/pi.csv", πgrid, ',')
-    savefig(p1, "../figures/HA_stationary/dist_over_a/wealth_low.pdf")
-    savefig(p2, "../figures/HA_stationary/dist_over_a/wealth_high.pdf")
+    writedlm("../data/HA/$(with)/stationary/dist_over_a/a.csv", agrid, ',')
+    writedlm("../data/HA/$(with)/stationary/dist_over_a/pi.csv", πgrid, ',')
+    savefig(p1, "../figures/HA/$(with)/stationary/dist_over_a/wealth_low.pdf")
+    savefig(p2, "../figures/HA/$(with)/stationary/dist_over_a/wealth_high.pdf")
 end
 
 
+
 #=
-para = HAmodel()
-para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(HAmodel())
+para = HAmodel(with_iid = true)
+@time para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 =#
 
 
@@ -394,7 +408,7 @@ para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(HAmodel())
 filenames = ["pi", "en", "n", "a"]
 data = π, ϵn_grid, n_grid, a_grid
 for (i, filename) in enumerate(filenames)
-    writedlm("../data/HA_stationary/dist_over_a_s/$(filename).csv", data[i], ',')
+    writedlm("../data/HA/$(para.with)/stationary/dist_over_a_s/$(filename).csv", data[i], ',')
 end
 =#
 
@@ -403,7 +417,7 @@ end
 #=
 wealth_dist(para, π)
 p_c, p_n, p_aprime = plot_policies(para)
-savefig(p_c, "../figures/HA_stationary/policies/c.pdf")
-savefig(p_n, "../figures/HA_stationary/policies/n.pdf")
-savefig(p_aprime, "../figures/HA_stationary/policies/aprime.pdf")
+savefig(p_c, "../figures/HA/$(para.with)/stationary/policies/c.pdf")
+savefig(p_n, "../figures/HA/$(para.with)/stationary/policies/n.pdf")
+savefig(p_aprime, "../figures/HA/$(para.with)/stationary/policies/aprime.pdf")
 =#

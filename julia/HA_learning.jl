@@ -4,29 +4,29 @@ include("HA_stationary.jl")
 
 
 ## Define the function that write as the code runs
-function write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, str)
-    writedlm("../data/HA_learning/$str/a/$t.csv", a, ',')
-    writedlm("../data/HA_learning/$str/mean_a/$t.csv", mean(a), ',')
-    writedlm("../data/HA_learning/$str/c/$t.csv", c, ',')
-    writedlm("../data/HA_learning/$str/mean_c/$t.csv", mean(c), ',')
-    writedlm("../data/HA_learning/$str/n/$t.csv", n, ',')
-    writedlm("../data/HA_learning/$str/mean_n/$t.csv", mean(n), ',')
-    writedlm("../data/HA_learning/$str/nu/$t.csv", ν, ',')
-    writedlm("../data/HA_learning/$str/mean_nu/$t.csv", mean(ν), ',')
-    writedlm("../data/HA_learning/$str/nu_bar/$t.csv", ν̄, ',')
-    writedlm("../data/HA_learning/$str/mean_nu_bar/$t.csv", mean(ν̄), ',')
-    writedlm("../data/HA_learning/$str/nu_bar_c/$t.csv", ν̄c, ',')
-    writedlm("../data/HA_learning/$str/mean_nu_bar_c/$t.csv", mean(ν̄c), ',')
-    writedlm("../data/HA_learning/$str/psi/$t.csv", ψ, ',')
-    writedlm("../data/HA_learning/$str/mean_psi/$t.csv", mean(ψ, 1), ',')
-    #writedlm("../data/HA_learning/$str/median_psi/$t.csv", median(ψ, 1), ',')
-    writedlm("../data/HA_learning/$str/r/$t.csv", r, ',')
-    writedlm("../data/HA_learning/$str/R_cov/$t.csv", R, ',')
-    writedlm("../data/HA_learning/$str/s/$t.csv", s, ',')
-    writedlm("../data/HA_learning/$str/mean_s/$t.csv", mean(s), ',')
-    writedlm("../data/HA_learning/$str/theta/$t.csv", θ, ',')
-    writedlm("../data/HA_learning/$str/w/$t.csv", w, ',')
-    writedlm("../data/HA_learning/$str/x/$t.csv", x, ',')
+function write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, str, with)
+    writedlm("../data/HA/$(with)/learning/$str/a/$t.csv", a, ',')
+    writedlm("../data/HA/$(with)/learning/$str/mean_a/$t.csv", mean(a), ',')
+    writedlm("../data/HA/$(with)/learning/$str/c/$t.csv", c, ',')
+    writedlm("../data/HA/$(with)/learning/$str/mean_c/$t.csv", mean(c), ',')
+    writedlm("../data/HA/$(with)/learning/$str/n/$t.csv", n, ',')
+    writedlm("../data/HA/$(with)/learning/$str/mean_n/$t.csv", mean(n), ',')
+    writedlm("../data/HA/$(with)/learning/$str/nu/$t.csv", ν, ',')
+    writedlm("../data/HA/$(with)/learning/$str/mean_nu/$t.csv", mean(ν), ',')
+    writedlm("../data/HA/$(with)/learning/$str/nu_bar/$t.csv", ν̄, ',')
+    writedlm("../data/HA/$(with)/learning/$str/mean_nu_bar/$t.csv", mean(ν̄), ',')
+    writedlm("../data/HA/$(with)/learning/$str/nu_bar_c/$t.csv", ν̄c, ',')
+    writedlm("../data/HA/$(with)/learning/$str/mean_nu_bar_c/$t.csv", mean(ν̄c), ',')
+    writedlm("../data/HA/$(with)/learning/$str/psi/$t.csv", ψ, ',')
+    writedlm("../data/HA/$(with)/learning/$str/mean_psi/$t.csv", mean(ψ, 1), ',')
+    writedlm("../data/HA/$(with)/learning/$str/median_psi/$t.csv", median(ψ, 1), ',')
+    writedlm("../data/HA/$(with)/learning/$str/r/$t.csv", r, ',')
+    writedlm("../data/HA/$(with)/learning/$str/R_cov/$t.csv", R, ',')
+    writedlm("../data/HA/$(with)/learning/$str/s/$t.csv", s, ',')
+    writedlm("../data/HA/$(with)/learning/$str/mean_s/$t.csv", mean(s), ',')
+    writedlm("../data/HA/$(with)/learning/$str/theta/$t.csv", θ, ',')
+    writedlm("../data/HA/$(with)/learning/$str/w/$t.csv", w, ',')
+    writedlm("../data/HA/$(with)/learning/$str/x/$t.csv", x, ',')
 end
 
 
@@ -68,11 +68,11 @@ function get_cf2(para, cf, r, w)
     n_con = 10
     compute_cmin2!(para, r, w, cf)
     @unpack σ, γ, β, χ, r̄, w̄, P, A, S, c_min2, k_spline = para
-    @unpack a_min, a_max, Na, ϕ_min, ϕ_max, N_ϕ, path = para
+    @unpack a_min, a_max, Na, ϕ_min, ϕ_max, N_ϕ, path, with= para
     ϕ_vec = linspace(ϕ_min, ϕ_max, N_ϕ)
     cf2 = Spline2D[]
     a′grid = construct_agrid(a_min,a_max,Na)
-    
+
     N_a = length(a′grid)
     #preallocate for speed
     a_grid = zeros(S, N_ϕ, N_a + n_con)
@@ -125,7 +125,7 @@ function get_cf2(para, cf, r, w)
                         y_vec = (c_grid[s , i_ϕ, start_i:end])[sort_indx]
                         cvec[:, i_ϕ] .= Spline1D(x_vec, y_vec; k = k_spline)(a′grid)
                         output = vcat([r w], [s ϕ_vec[i_ϕ]], hcat(a_grid[s, i_ϕ, start_i:end], c_grid[s , i_ϕ, start_i:end]))
-                        writedlm("../data/HA_learning/simulations/$path/spline/$(now()).csv", output, ',')
+                        writedlm("../data/HA/$(with)/learning/simulations/$path/spline/$(now()).csv", output, ',')
                     end
                 end
             #If the constraint binds binds need to use all the grid points
@@ -384,7 +384,7 @@ end
 ## 3. ν̄ci_t - current marginal utility in steady state ν̄c
 ## 4. x_t - vector of aggregate states [1; log(mean(a) / ā); log(θ_t[t])]
 function simul_learning(para, π, keep_const)
-    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄, path = para
+    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄, path, with = para
     ## Initialize functions
     cf = get_cf(para)
     bin_midpts = get_bins(a_min, a_max, N)
@@ -400,7 +400,7 @@ function simul_learning(para, π, keep_const)
     for t in 1:T
         println(t)
         c, n, a′, ν, ν̄, ν̄c, r, w = TE(para, a, s, ψ, x, cf)
-        write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, path)
+        write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, path, with)
         if t == T break end
         s′ = update_s(para, s, t)
         θ′ = drawθ(θ, σ_ϵ, ρ)
@@ -452,13 +452,13 @@ end
 ## Return variables of interest: averge (consumptions, labors, assets, marginal utilitys, beliefs),
 ## and interest rates and wages.
 function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
-    @unpack N, a_min, a_max, agent_num, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄, path = para
+    @unpack N, a_min, a_max, agent_num, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄, path, with = para
     T = length(θ_t)
     ## Initialize functions
     cf = get_cf(para)
-    a = convert(Array{Float64, 2}, readdlm("../data/HA_learning/simulations/from_HA/$gain/a/$t_sample.csv", ','))
-    s = convert(Array{Int64, 2}, readdlm("../data/HA_learning/simulations/from_HA/$gain/s/$t_sample.csv", ','))
-    ψ = convert(Array{Float64, 2}, readdlm("../data/HA_learning/simulations/from_HA/$gain/psi/$t_sample.csv", ','))
+    a = convert(Array{Float64, 2}, readdlm("../data/HA/$(with)/learning/simulations/from_HA/$gain/a/$t_sample.csv", ','))
+    s = convert(Array{Int64, 2}, readdlm("../data/HA/$(with)/learning/simulations/from_HA/$gain/s/$t_sample.csv", ','))
+    ψ = convert(Array{Float64, 2}, readdlm("../data/HA/$(with)/learning/simulations/from_HA/$gain/psi/$t_sample.csv", ','))
     c, n, ν, ν̄, ν̄c, r, w, s′, a′, ψ′, R, R′,θ, θ′, x_, x, x′ = init_data_irf(agent_num, ψ̄, R̄, ā, a, θ_t)
     set_ϕ_range!(para, ψ, x)
     #=Loop through t = 1..T, each variable is index comtemporanously.
@@ -469,7 +469,7 @@ function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
     for t in 1:T
         println(t)
         c, n, a′, ν, ν̄, ν̄c, r, w = TE(para, a, s, ψ, x, cf)
-        write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, "$path/$(prepost)_shock")
+        write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, "$path/$(prepost)_shock", with)
         if t == T break end
         s′ = update_s(para, s, t)
         θ′ = θ_t[t + 1]
@@ -510,29 +510,29 @@ end
 
 
 ## get irf from the saved data
-function get_irf(path, gain, t_sample, Sim_T)
+function get_irf(with, path, gain, t_sample, Sim_T)
     c_post, n_post, a_post, ν_post, r_post, w_post, θ_post = [zeros(Sim_T) for i in 1:7]
     c_pre, n_pre, a_pre, ν_pre, r_pre, w_pre, θ_pre = [zeros(Sim_T) for i in 1:7]
     ψ_post = zeros(Sim_T, 3)
     ψ_pre = zeros(Sim_T, 3)
     for t in 1:Sim_T
-        c_post[t] = readdlm("../data/HA_learning/$(path)/post_shock/mean_c/$t.csv", ',')[1]
-        n_post[t] = readdlm("../data/HA_learning/$(path)/post_shock/mean_n/$t.csv", ',')[1]
-        a_post[t] = readdlm("../data/HA_learning/$(path)/post_shock/mean_a/$t.csv", ',')[1]
-        ν_post[t] = readdlm("../data/HA_learning/$(path)/post_shock/mean_nu/$t.csv", ',')[1]
-        r_post[t] = readdlm("../data/HA_learning/$(path)/post_shock/r/$t.csv", ',')[1]
-        w_post[t] = readdlm("../data/HA_learning/$(path)/post_shock/w/$t.csv", ',')[1]
-        ψ_post[t, :] = readdlm("../data/HA_learning/$(path)/post_shock/mean_psi/$t.csv", ',')
-        θ_post[t] = readdlm("../data/HA_learning/$(path)/post_shock/theta/$t.csv", ',')[1]
+        c_post[t] = readdlm("../data/HA/$(with)/learning/$(path)/post_shock/mean_c/$t.csv", ',')[1]
+        n_post[t] = readdlm("../data/HA/$(with)/learning/$(path)/post_shock/mean_n/$t.csv", ',')[1]
+        a_post[t] = readdlm("../data/HA/$(with)/learning/$(path)/post_shock/mean_a/$t.csv", ',')[1]
+        ν_post[t] = readdlm("../data/HA/$(with)/learning/$(path)/post_shock/mean_nu/$t.csv", ',')[1]
+        r_post[t] = readdlm("../data/HA/$(with)/learning/$(path)/post_shock/r/$t.csv", ',')[1]
+        w_post[t] = readdlm("../data/HA/$(with)/learning/$(path)/post_shock/w/$t.csv", ',')[1]
+        ψ_post[t, :] = readdlm("../data/HA/$(with)/learning/$(path)/post_shock/mean_psi/$t.csv", ',')
+        θ_post[t] = readdlm("../data/HA/$(with)/learning/$(path)/post_shock/theta/$t.csv", ',')[1]
         ############################################################################
-        c_pre[t] = readdlm("../data/HA_learning/$(path)/pre_shock/mean_c/$t.csv", ',')[1]
-        n_pre[t] = readdlm("../data/HA_learning/$(path)/pre_shock/mean_n/$t.csv", ',')[1]
-        a_pre[t] = readdlm("../data/HA_learning/$(path)/pre_shock/mean_a/$t.csv", ',')[1]
-        ν_pre[t] = readdlm("../data/HA_learning/$(path)/pre_shock/mean_nu/$t.csv", ',')[1]
-        r_pre[t] = readdlm("../data/HA_learning/$(path)/pre_shock/r/$t.csv", ',')[1]
-        w_pre[t] = readdlm("../data/HA_learning/$(path)/pre_shock/w/$t.csv", ',')[1]
-        ψ_pre[t, :] = readdlm("../data/HA_learning/$(path)/pre_shock/mean_psi/$t.csv", ',')
-        θ_pre[t] = readdlm("../data/HA_learning/$(path)/pre_shock/theta/$t.csv", ',')[1]
+        c_pre[t] = readdlm("../data/HA/$(with)/learning/$(path)/pre_shock/mean_c/$t.csv", ',')[1]
+        n_pre[t] = readdlm("../data/HA/$(with)/learning/$(path)/pre_shock/mean_n/$t.csv", ',')[1]
+        a_pre[t] = readdlm("../data/HA/$(with)/learning/$(path)/pre_shock/mean_a/$t.csv", ',')[1]
+        ν_pre[t] = readdlm("../data/HA/$(with)/learning/$(path)/pre_shock/mean_nu/$t.csv", ',')[1]
+        r_pre[t] = readdlm("../data/HA/$(with)/learning/$(path)/pre_shock/r/$t.csv", ',')[1]
+        w_pre[t] = readdlm("../data/HA/$(with)/learning/$(path)/pre_shock/w/$t.csv", ',')[1]
+        ψ_pre[t, :] = readdlm("../data/HA/$(with)/learning/$(path)/pre_shock/mean_psi/$t.csv", ',')
+        θ_pre[t] = readdlm("../data/HA/$(with)/learning/$(path)/pre_shock/theta/$t.csv", ',')[1]
     end
     c_irf = c_post - c_pre
     n_irf = n_post - n_pre
@@ -542,56 +542,56 @@ function get_irf(path, gain, t_sample, Sim_T)
     w_irf = w_post - w_pre
     ψ_irf = ψ_post - ψ_pre
     θ_irf = θ_post - θ_pre
-    writedlm("../data/HA_learning/$(path)/irf/c.csv", c_irf, ',')
-    writedlm("../data/HA_learning/$(path)/irf/n.csv", n_irf, ',')
-    writedlm("../data/HA_learning/$(path)/irf/a.csv", a_irf, ',')
-    writedlm("../data/HA_learning/$(path)/irf/nu.csv", ν_irf, ',')
-    writedlm("../data/HA_learning/$(path)/irf/r.csv", r_irf, ',')
-    writedlm("../data/HA_learning/$(path)/irf/w.csv", w_irf, ',')
-    writedlm("../data/HA_learning/$(path)/irf/psi.csv", ψ_irf, ',')
-    writedlm("../data/HA_learning/$(path)/irf/theta.csv", θ_irf, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/irf/c.csv", c_irf, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/irf/n.csv", n_irf, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/irf/a.csv", a_irf, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/irf/nu.csv", ν_irf, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/irf/r.csv", r_irf, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/irf/w.csv", w_irf, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/irf/psi.csv", ψ_irf, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/irf/theta.csv", θ_irf, ',')
 end
 
 
 
 ## combine irfs
-function combine_irfs(Sim_T, samples, gain)
+function combine_irfs(with, Sim_T, samples, gain)
     c, n, a, ν, r, w, ψ1, ψ2, ψ3 = [zeros(Sim_T, length(samples)) for _ in 1:9]
     for (t, sample) in enumerate(samples)
         println("$gain, t = $t")
-        c[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/c.csv", ',')
-        n[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/n.csv", ',')
-        a[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/a.csv", ',')
-        ν[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/nu.csv", ',')
-        r[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/r.csv", ',')
-        w[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/w.csv", ',')
-        ψ1[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/psi.csv", ',')[:, 1]
-        ψ2[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/psi.csv", ',')[:, 2]
-        ψ3[:, t] = readdlm("../data/HA_learning/IRFs/$gain/$sample/irf/psi.csv", ',')[:, 3]
+        c[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/c.csv", ',')
+        n[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/n.csv", ',')
+        a[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/a.csv", ',')
+        ν[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/nu.csv", ',')
+        r[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/r.csv", ',')
+        w[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/w.csv", ',')
+        ψ1[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/psi.csv", ',')[:, 1]
+        ψ2[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/psi.csv", ',')[:, 2]
+        ψ3[:, t] = readdlm("../data/HA/$(with)/learning/IRFs/$gain/$sample/irf/psi.csv", ',')[:, 3]
     end
-    writedlm("../data/HA_learning/IRFs/$gain/combined/c.csv", c, ',')
-    writedlm("../data/HA_learning/IRFs/$gain/combined/n.csv", n, ',')
-    writedlm("../data/HA_learning/IRFs/$gain/combined/a.csv", a, ',')
-    writedlm("../data/HA_learning/IRFs/$gain/combined/nu.csv", ν, ',')
-    writedlm("../data/HA_learning/IRFs/$gain/combined/r.csv", r, ',')
-    writedlm("../data/HA_learning/IRFs/$gain/combined/w.csv", w, ',')
-    writedlm("../data/HA_learning/IRFs/$gain/combined/psi1.csv", ψ1, ',')
-    writedlm("../data/HA_learning/IRFs/$gain/combined/psi2.csv", ψ2, ',')
-    writedlm("../data/HA_learning/IRFs/$gain/combined/psi3.csv", ψ3, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/c.csv", c, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/n.csv", n, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/a.csv", a, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/nu.csv", ν, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/r.csv", r, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/w.csv", w, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/psi1.csv", ψ1, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/psi2.csv", ψ2, ',')
+    writedlm("../data/HA/$(with)/learning/IRFs/$gain/combined/psi3.csv", ψ3, ',')
 end
 
 
 ## read irfs
-function read_irfs(gain)
-    c = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/c.csv", ','))
-    n = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/n.csv", ','))
-    a = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/a.csv", ','))
-    ν = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/nu.csv", ','))
-    r = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/r.csv", ','))
-    w = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/w.csv", ','))
-    ψ1 = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/psi1.csv", ','))
-    ψ2 = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/psi2.csv", ','))
-    ψ3 = convert(Matrix{Float64}, readdlm("../data/HA_learning/IRFs/$gain/combined/psi3.csv", ','))
+function read_irfs(with, gain)
+    c = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/c.csv", ','))
+    n = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/n.csv", ','))
+    a = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/a.csv", ','))
+    ν = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/nu.csv", ','))
+    r = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/r.csv", ','))
+    w = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/w.csv", ','))
+    ψ1 = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/psi1.csv", ','))
+    ψ2 = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/psi2.csv", ','))
+    ψ3 = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/psi3.csv", ','))
     return c, n, a, ν, r, w, ψ1, ψ2, ψ3
 end
 
@@ -623,28 +623,28 @@ end
 
 ## Compute the coefficients from simulating learning with holding the beliefs at HA_rational
 function compute_coeffs(para)
-    @unpack T, agent_num, path, ā = para
+    @unpack T, agent_num, path, with, ā = para
     coeffs = zeros(agent_num, 3)
     ν = zeros(T, agent_num)
     ν̄c = zeros(T, agent_num)
     a, θ = [zeros(T) for _ in 1:2]
     for t in 1:T
         println("t = $t")
-        ν[t, :] = readdlm("../data/HA_learning/$(path)/nu/$(t).csv", ',')
-        ν̄c[t, :] = readdlm("../data/HA_learning/$(path)/nu_bar_c/$(t).csv", ',')
-        a[t] = readdlm("../data/HA_learning/$(path)/mean_a/$(t).csv", ',')[1]
-        θ[t] = readdlm("../data/HA_learning/$(path)/theta/$(t).csv", ',')[1]
+        ν[t, :] = readdlm("../data/HA/$(with)/learning/$(path)/nu/$(t).csv", ',')
+        ν̄c[t, :] = readdlm("../data/HA/$(with)/learning/$(path)/nu_bar_c/$(t).csv", ',')
+        a[t] = readdlm("../data/HA/$(with)/learning/$(path)/mean_a/$(t).csv", ',')[1]
+        θ[t] = readdlm("../data/HA/$(with)/learning/$(path)/theta/$(t).csv", ',')[1]
     end
     RHS = [ones(T) log.((a / ā)) log.(θ)][1:T - 1, :]
     for i in 1:agent_num
         LHS = log.(ν[2:T, i] ./ ν̄c[2:T, i])
         coeffs[i, :] = inv(RHS' * RHS) * (RHS' * LHS)
     end
-    writedlm("../data/HA_learning/$(path)/coeff/all_agents.csv", coeffs, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/coeff/all_agents.csv", coeffs, ',')
 end
 
 
-#=
+
 ####################################################################################################
 #                            Long simulations with learning
 ####################################################################################################
@@ -660,7 +660,7 @@ indx = ps["i"]
 
 
 
-para = HAmodel()
+para = HAmodel(with_iid = true)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 para.T = 10_000
 para.agent_num = 100_000
@@ -694,26 +694,30 @@ simul_learning(para, π, keep_const)
 
 
 
+#=
+####################################################################################################
+#                           Plot beliefs evolution
+####################################################################################################
 start = "from_HA"
 gain = "gain_0.005"
-psi = readdlm("../data/HA_learning/simulations/$start/$gain/mean_psi/combined.csv", ',')
+psi = readdlm("../data/HA/$(with)/learning/simulations/$start/$gain/mean_psi/combined.csv", ',')
 plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "Mean Beliefs")
 plot!(ones(size(psi, 1), 1) .* [6.32e-07 -0.618232182 -0.852232561], label = "", ls = :dash)
-savefig("../figures/HA_learning/simulations/mean/$(start)_$(gain).pdf")
+savefig("../figures/HA/$(with)/learning/simulations/mean/$(start)_$(gain).pdf")
 
 
 
 plot(title = "diff between zeros and RA, gain = 0.01", label = "",
-readdlm("../data/HA_learning/simulations/from_RA/gain_0.01/mean_psi/combined.csv", ',') -
-readdlm("../data/HA_learning/simulations/from_zeros/gain_0.01/mean_psi/combined.csv", ','))
-savefig("../figures/HA_learning/simulations/diff/mean/RA-zeros_0.01.png")
+readdlm("../data/HA/$(with)/learning/simulations/from_RA/gain_0.01/mean_psi/combined.csv", ',') -
+readdlm("../data/HA/$(with)/learning/simulations/from_zeros/gain_0.01/mean_psi/combined.csv", ','))
+savefig("../figures/HA/$(with)/learning/simulations/diff/mean/RA-zeros_0.01.png")
 
 
 
 plot(title = "diff between RA and HA, gain = 0.01", label = "",
-readdlm("../data/HA_learning/simulations/from_HA/gain_0.01/mean_psi/combined.csv", ',') -
-readdlm("../data/HA_learning/simulations/from_RA/gain_0.01/mean_psi/combined.csv", ','))
-savefig("../figures/HA_learning/simulations/diff/mean/HA-RA_0.01.png")
+readdlm("../data/HA/$(with)/learning/simulations/from_HA/gain_0.01/mean_psi/combined.csv", ',') -
+readdlm("../data/HA/$(with)/learning/simulations/from_RA/gain_0.01/mean_psi/combined.csv", ','))
+savefig("../figures/HA/$(with)/learning/simulations/diff/mean/HA-RA_0.01.png")
 =#
 
 
@@ -757,18 +761,18 @@ end
 
 
 #IRFs(para, gain, t_sample, Sim_T)
-#get_irf(para.path, gain, t_sample, Sim_T)
-#for gain in ["gain_0.005", "gain_0.01"] combine_irfs(Sim_T, samples, gain) end
+#get_irf(para.with, para.path, gain, t_sample, Sim_T)
+#for gain in ["gain_0.005", "gain_0.01"] combine_irfs(para.with, Sim_T, samples, gain) end
 names = ["c", "n", "a", "nu", "r", "w", "psi1", "psi2", "psi3"]
 plot_vec = plot_irf_confidence(α, gain, Sim_T, names)
 for (i, p) in enumerate(plot_vec)
-    savefig(p, "../figures/HA_learning/IRFs/$gain/$(names[i]).png")
+    savefig(p, "../figures/HA/$(with)/learning/IRFs/$gain/$(names[i]).png")
 end
 =#
 
 
 
-
+#=
 ####################################################################################################
 #                         Check learning with constant beliefs set at HA rational
 ####################################################################################################
@@ -781,7 +785,7 @@ para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
 keep_const = true
 simul_learning(para, π, keep_const)
 compute_coeffs(para)
-
+=#
 
 
 
