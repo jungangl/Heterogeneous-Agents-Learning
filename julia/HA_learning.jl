@@ -682,11 +682,11 @@ elseif indx == 4
     para.γ_gain = t -> 0.01
 elseif indx == 5
     para.path = "simulations/from_HA/gain_0.005"
-    para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
+    para.ψ̄ = [-6.54E-06; -0.588867813; -0.788101571]
     para.γ_gain = t -> 0.005
 elseif indx == 6
     para.path = "simulations/from_HA/gain_0.01"
-    para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
+    para.ψ̄ = [-6.54E-06; -0.588867813; -0.788101571]
     para.γ_gain = t -> 0.01
 end
 keep_const = false
