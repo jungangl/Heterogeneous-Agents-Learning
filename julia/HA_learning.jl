@@ -694,6 +694,7 @@ simul_learning(para, π, keep_const)
 
 
 
+
 #=
 ####################################################################################################
 #                           Plot beliefs evolution
@@ -725,7 +726,7 @@ savefig("../figures/HA/$(with)/learning/simulations/diff/mean/HA-RA_0.01.png")
 
 #=
 ####################################################################################################
-#                            Long simulations with learning
+#                           IRF with confidence intervals
 ####################################################################################################
 s = ArgParseSettings()
 @add_arg_table s begin
@@ -776,12 +777,12 @@ end
 ####################################################################################################
 #                         Check learning with constant beliefs set at HA rational
 ####################################################################################################
-para = HAmodel()
+para = HAmodel(with_iid = true)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-para.T = 4_000
+para.T = 5_000
 para.agent_num = 100_000
 para.path = "simulations/keep_const"
-para.ψ̄ = [6.32e-07; -0.618232182; -0.852232561]
+para.ψ̄ = [-6.54E-06; -0.588867813; -0.788101571]
 keep_const = true
 simul_learning(para, π, keep_const)
 compute_coeffs(para)
