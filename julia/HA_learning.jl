@@ -645,6 +645,7 @@ end
 
 
 
+
 ####################################################################################################
 #                            Long simulations with learning
 ####################################################################################################
@@ -673,7 +674,7 @@ elseif indx == 2
     para.ψ̄ = zeros(3)
     para.γ_gain = t -> 0.01
 elseif indx == 3
-    para.path = "from_RA/gain_0.005"
+    para.path = "simulations/from_RA/gain_0.005"
     para.ψ̄ = [-0.00131466; -0.765091; -0.655608]
     para.γ_gain = t -> 0.005
 elseif indx == 4
@@ -699,28 +700,30 @@ simul_learning(para, π, keep_const)
 ####################################################################################################
 #                           Plot beliefs evolution
 ####################################################################################################
-start = "from_HA"
+with = "with_iid"
+start = "from_RA"
 gain = "gain_0.005"
-psi = readdlm("../data/HA/$(with)/learning/simulations/$start/$gain/mean_psi/combined.csv", ',')
-plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "Mean Beliefs")
-plot!(ones(size(psi, 1), 1) .* [6.32e-07 -0.618232182 -0.852232561], label = "", ls = :dash)
-savefig("../figures/HA/$(with)/learning/simulations/mean/$(start)_$(gain).pdf")
+var = "median"
+psi = readdlm("../data/HA/$(with)/learning/simulations/$start/$gain/$(var)_psi/combined.csv", ',')
+plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "$(var) Beliefs")
+plot!(ones(size(psi, 1), 1) .* [-6.54E-06 -0.588867813 -0.788101571], label = "", ls = :dash)
+savefig("../figures/HA/$(with)/learning/simulations/$var/$(start)_$(gain).pdf")
+
+
+var = "median"
+gain = "gain_0.01"
+plot(title = "diff between zeros and RA, $(gain)", label = "",
+readdlm("../data/HA/$(with)/learning/simulations/from_RA/$(gain)/$(var)_psi/combined.csv", ',') -
+readdlm("../data/HA/$(with)/learning/simulations/from_zeros/$(gain)/$(var)_psi/combined.csv", ','))
+savefig("../figures/HA/$(with)/learning/simulations/diff/$var/RA-zeros_$gain.png")
 
 
 
-plot(title = "diff between zeros and RA, gain = 0.01", label = "",
-readdlm("../data/HA/$(with)/learning/simulations/from_RA/gain_0.01/mean_psi/combined.csv", ',') -
-readdlm("../data/HA/$(with)/learning/simulations/from_zeros/gain_0.01/mean_psi/combined.csv", ','))
-savefig("../figures/HA/$(with)/learning/simulations/diff/mean/RA-zeros_0.01.png")
-
-
-
-plot(title = "diff between RA and HA, gain = 0.01", label = "",
-readdlm("../data/HA/$(with)/learning/simulations/from_HA/gain_0.01/mean_psi/combined.csv", ',') -
-readdlm("../data/HA/$(with)/learning/simulations/from_RA/gain_0.01/mean_psi/combined.csv", ','))
-savefig("../figures/HA/$(with)/learning/simulations/diff/mean/HA-RA_0.01.png")
+plot(title = "diff between RA and HA, $(gain)", label = "",
+readdlm("../data/HA/$(with)/learning/simulations/from_HA/$(gain)/$(var)_psi/combined.csv", ',') -
+readdlm("../data/HA/$(with)/learning/simulations/from_RA/$(gain)/$(var)_psi/combined.csv", ','))
+savefig("../figures/HA/$(with)/learning/simulations/diff/$(var)/HA-RA_$(gain).png")
 =#
-
 
 
 
@@ -742,7 +745,8 @@ indx = ps["i"]
 
 srand(1)
 samples = sort(sample(5001:10000, 500, replace = false))
-para = HAmodel()
+para = HAmodel(with_iid = true)
+para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 para.agent_num = 100_000
 Sim_T = 200
 gain = ""
@@ -784,9 +788,11 @@ para.agent_num = 100_000
 para.path = "simulations/keep_const"
 para.ψ̄ = [-6.54E-06; -0.588867813; -0.788101571]
 keep_const = true
-simul_learning(para, π, keep_const)
+#simul_learning(para, π, keep_const)
 compute_coeffs(para)
 =#
+
+
 
 
 

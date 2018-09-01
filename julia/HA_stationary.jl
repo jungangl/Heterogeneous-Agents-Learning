@@ -1,3 +1,4 @@
+Pkg.add("FastGaussQuadrature.jl")
 using QuantEcon, Parameters, CSV, StatsBase
 using NLsolve, Dierckx, Plots, Distributions, ArgParse
 using FastGaussQuadrature
@@ -373,6 +374,7 @@ function calibrate_stationary(para)
     #res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
     #para.β, para.χ = res.zero
     diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid = stationary_resid([para.β, para.χ], α, K2Y, n̄, K2EN, para)
+    para.ā = dot(π, a_grid)
     return para, π, K2EN, ϵn_grid, n_grid, a_grid
 end
 
