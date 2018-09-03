@@ -645,7 +645,7 @@ end
 
 
 
-
+#=
 ####################################################################################################
 #                            Long simulations with learning
 ####################################################################################################
@@ -692,38 +692,45 @@ elseif indx == 6
 end
 keep_const = false
 simul_learning(para, π, keep_const)
+=#
 
 
 
 
-#=
 ####################################################################################################
 #                           Plot beliefs evolution
 ####################################################################################################
 with = "with_iid"
-start = "from_RA"
-gain = "gain_0.005"
-var = "median"
-psi = readdlm("../data/HA/$(with)/learning/simulations/$start/$gain/$(var)_psi/combined.csv", ',')
-plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "$(var) Beliefs")
-plot!(ones(size(psi, 1), 1) .* [-6.54E-06 -0.588867813 -0.788101571], label = "", ls = :dash)
-savefig("../figures/HA/$(with)/learning/simulations/$var/$(start)_$(gain).pdf")
-
-
-var = "median"
-gain = "gain_0.01"
-plot(title = "diff between zeros and RA, $(gain)", label = "",
-readdlm("../data/HA/$(with)/learning/simulations/from_RA/$(gain)/$(var)_psi/combined.csv", ',') -
-readdlm("../data/HA/$(with)/learning/simulations/from_zeros/$(gain)/$(var)_psi/combined.csv", ','))
-savefig("../figures/HA/$(with)/learning/simulations/diff/$var/RA-zeros_$gain.png")
+for start in ["from_zeros", "from_RA", "from_HA"]
+    for gain in ["gain_0.005", "gain_0.01"]
+        for var in ["median", "mean"]
+            psi = readdlm("../data/HA/$(with)/learning/simulations/$start/$gain/$(var)_psi/combined.csv", ',')
+            plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "$(var) Beliefs")
+            plot!(ones(size(psi, 1), 1) .* [-6.54E-06 -0.588867813 -0.788101571], label = "", ls = :dash)
+            savefig("../figures/HA/$(with)/learning/simulations/$var/$(start)_$(gain).pdf")
+        end
+    end
+end
 
 
 
-plot(title = "diff between RA and HA, $(gain)", label = "",
-readdlm("../data/HA/$(with)/learning/simulations/from_HA/$(gain)/$(var)_psi/combined.csv", ',') -
-readdlm("../data/HA/$(with)/learning/simulations/from_RA/$(gain)/$(var)_psi/combined.csv", ','))
-savefig("../figures/HA/$(with)/learning/simulations/diff/$(var)/HA-RA_$(gain).png")
-=#
+for var in ["median", "mean"]
+    for gain in ["gain_0.005", "gain_0.01"]
+        plot(title = "diff between zeros and RA, $(gain)", label = "",
+        readdlm("../data/HA/$(with)/learning/simulations/from_RA/$(gain)/$(var)_psi/combined.csv", ',') -
+        readdlm("../data/HA/$(with)/learning/simulations/from_zeros/$(gain)/$(var)_psi/combined.csv", ','))
+        savefig("../figures/HA/$(with)/learning/simulations/diff/$var/RA-zeros_$gain.png")
+
+
+
+        plot(title = "diff between RA and HA, $(gain)", label = "",
+        readdlm("../data/HA/$(with)/learning/simulations/from_HA/$(gain)/$(var)_psi/combined.csv", ',') -
+        readdlm("../data/HA/$(with)/learning/simulations/from_RA/$(gain)/$(var)_psi/combined.csv", ','))
+        savefig("../figures/HA/$(with)/learning/simulations/diff/$(var)/HA-RA_$(gain).png")
+    end
+end
+
+
 
 
 
@@ -788,18 +795,9 @@ para.agent_num = 100_000
 para.path = "simulations/keep_const"
 para.ψ̄ = [-6.54E-06; -0.588867813; -0.788101571]
 keep_const = true
-#simul_learning(para, π, keep_const)
+simul_learning(para, π, keep_const)
 compute_coeffs(para)
 =#
-
-
-
-
-
-
-
-
-
 
 
 
