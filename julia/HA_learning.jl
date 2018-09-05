@@ -342,26 +342,25 @@ end
 ## based on draws from the stationary distribution
 ## This initialization assumes homogeneity in beliefs - all initialized as ψ̄
 ## This function is used by simul_learning
-function init_asψ(agent_num, bin_midpts, draws, ψ̄)
+function init_as(agent_num, bin_midpts, draws)
     ai_1 = zeros(agent_num)
     si_1 = zeros(Int64, agent_num)
-    ψi_0 = zeros(agent_num,3)
     for (i, draw) in enumerate(draws)
         ai_1[i] = bin_midpts[draw[1]]
         si_1[i] = draw[2]
-        ψi_0[i,:] = ψ̄
     end
-    return ai_1, si_1, ψi_0
+    return ai_1, si_1
 end
 
 
 
 ####################################################################################################
 ## Define a function that initialize the data of interest
-function init_data_learning(agent_num, bin_midpts, draws, ψ̄, R̄, ā)
+function init_data_learning(agent_num, bin_midpts, draws, ψ_init, R̄, ā)
     r, w = zeros(2)
     c, n, ν, ν̄, ν̄c = [zeros(agent_num) for i in 1:5]
-    a, s, ψ = init_asψ(agent_num, bin_midpts, draws, ψ̄)
+    a, s = init_as(agent_num, bin_midpts, draws)
+    ψ = ψ_init
     s′ = zeros(Int64, agent_num)
     a′ = zeros(agent_num)
     ψ′ = zeros(agent_num, 3)
@@ -384,13 +383,13 @@ end
 ## 3. ν̄ci_t - current marginal utility in steady state ν̄c
 ## 4. x_t - vector of aggregate states [1; log(mean(a) / ā); log(θ_t[t])]
 function simul_learning(para, π, keep_const)
-    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄, path, with = para
+    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ_init, R̄, path, with = para
     ## Initialize functions
     cf = get_cf(para)
     bin_midpts = get_bins(a_min, a_max, N)
     draws = dimtrans1to2.(N, rand(DiscreteRV(π), agent_num))
     ## Initialize data of interest
-    c, n, ν, ν̄, ν̄c, r, w, s, s′, a, a′, ψ, ψ′, R, R′, θ, θ′, x_, x, x′ = init_data_learning(agent_num, bin_midpts, draws, ψ̄, R̄, ā)
+    c, n, ν, ν̄, ν̄c, r, w, s, s′, a, a′, ψ, ψ′, R, R′, θ, θ′, x_, x, x′ = init_data_learning(agent_num, bin_midpts, draws, ψ_init, R̄, ā)
     set_ϕ_range!(para, ψ, x)
     #= Loop through t = 1..T, each variable is index comtemporanously.
     Here the vector ψ[:,t] = {ψ_0,ψ_1,ψ_2,...} R[:,:,t] = {R_0,R_1,R_2,...}
@@ -405,7 +404,7 @@ function simul_learning(para, π, keep_const)
         s′ = update_s(para, s, t)
         θ′ = drawθ(θ, σ_ϵ, ρ)
         x′ = [1; log(mean(a′) / ā); log(θ′)]
-        R′ = update_R(R, x, t - 1, γ_gain, false)
+        R′ = update_R(R, x, t - 1, γ_gain, keep_const)
         if t == 1
             ψ′ = ψ
         else
@@ -427,7 +426,7 @@ end
 
 ####################################################################################################
 ## Define a function that initialize the data of interest
-function init_data_irf(agent_num, ψ̄, R̄, ā, a, θ_t)
+function init_data_irf(agent_num, R̄, ā, a, θ_t)
     r, w = zeros(2)
     c, n, ν, ν̄, ν̄c = [zeros(agent_num) for i in 1:5]
     s′ = zeros(Int64, agent_num)
@@ -452,14 +451,14 @@ end
 ## Return variables of interest: averge (consumptions, labors, assets, marginal utilitys, beliefs),
 ## and interest rates and wages.
 function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
-    @unpack N, a_min, a_max, agent_num, ā, ρ, σ_ϵ, γ_gain, ψ̄, R̄, path, with = para
+    @unpack N, a_min, a_max, agent_num, ā, ρ, σ_ϵ, γ_gain, ψ_init, R̄, path, with = para
     T = length(θ_t)
     ## Initialize functions
     cf = get_cf(para)
     a = convert(Array{Float64, 2}, readdlm("../data/HA/$(with)/learning/simulations/from_HA/$gain/a/$t_sample.csv", ','))
     s = convert(Array{Int64, 2}, readdlm("../data/HA/$(with)/learning/simulations/from_HA/$gain/s/$t_sample.csv", ','))
     ψ = convert(Array{Float64, 2}, readdlm("../data/HA/$(with)/learning/simulations/from_HA/$gain/psi/$t_sample.csv", ','))
-    c, n, ν, ν̄, ν̄c, r, w, s′, a′, ψ′, R, R′,θ, θ′, x_, x, x′ = init_data_irf(agent_num, ψ̄, R̄, ā, a, θ_t)
+    c, n, ν, ν̄, ν̄c, r, w, s′, a′, ψ′, R, R′,θ, θ′, x_, x, x′ = init_data_irf(agent_num, R̄, ā, a, θ_t)
     set_ϕ_range!(para, ψ, x)
     #=Loop through t = 1..T, each variable is index comtemporanously.
     Here the vector ψ[:,t] = {ψ_0,ψ_1,ψ_2,...} R[:,:,t] = {R_0,R_1,R_2,...}
@@ -581,6 +580,7 @@ function combine_irfs(with, Sim_T, samples, gain)
 end
 
 
+
 ## read irfs
 function read_irfs(with, gain)
     c = convert(Matrix{Float64}, readdlm("../data/HA/$(with)/learning/IRFs/$gain/combined/c.csv", ','))
@@ -641,6 +641,7 @@ function compute_coeffs(para)
         coeffs[i, :] = inv(RHS' * RHS) * (RHS' * LHS)
     end
     writedlm("../data/HA/$(with)/learning/$(path)/coeff/all_agents.csv", coeffs, ',')
+    writedlm("../data/HA/$(with)/learning/$(path)/coeff/mean_psi.csv", mean(coeffs, 1), ',')
 end
 
 
@@ -667,27 +668,27 @@ para.T = 10_000
 para.agent_num = 100_000
 if indx == 1
     para.path = "simulations/from_zeros/gain_0.005"
-    para.ψ̄ = zeros(3)
+    para.ψ_init = zeros(3)' .* ones(para.agent_num)
     para.γ_gain = t -> 0.005
 elseif indx == 2
     para.path = "simulations/from_zeros/gain_0.01"
-    para.ψ̄ = zeros(3)
+    para.ψ_init = zeros(3)' .* ones(para.agent_num)
     para.γ_gain = t -> 0.01
 elseif indx == 3
     para.path = "simulations/from_RA/gain_0.005"
-    para.ψ̄ = [-0.00131466; -0.765091; -0.655608]
+    para.ψ_init = [-0.00131466; -0.765091; -0.655608]' .* ones(para.agent_num)
     para.γ_gain = t -> 0.005
 elseif indx == 4
     para.path = "simulations/from_RA/gain_0.01"
-    para.ψ̄ = [-0.00131466; -0.765091; -0.655608]
+    para.ψ_init = [-0.00131466; -0.765091; -0.655608]' .* ones(para.agent_num)
     para.γ_gain = t -> 0.01
 elseif indx == 5
     para.path = "simulations/from_HA/gain_0.005"
-    para.ψ̄ = [-6.54E-06; -0.588867813; -0.788101571]
+    para.ψ_init = [-6.54E-06; -0.588867813; -0.788101571]' .* ones(para.agent_num)
     para.γ_gain = t -> 0.005
 elseif indx == 6
     para.path = "simulations/from_HA/gain_0.01"
-    para.ψ̄ = [-6.54E-06; -0.588867813; -0.788101571]
+    para.ψ_init = [-6.54E-06; -0.588867813; -0.788101571]' .* ones(para.agent_num)
     para.γ_gain = t -> 0.01
 end
 keep_const = false
@@ -696,7 +697,7 @@ simul_learning(para, π, keep_const)
 
 
 
-
+#=
 ####################################################################################################
 #                           Plot beliefs evolution
 ####################################################################################################
@@ -729,7 +730,7 @@ for var in ["median", "mean"]
         savefig("../figures/HA/$(with)/learning/simulations/diff/$(var)/HA-RA_$(gain).png")
     end
 end
-
+=#
 
 
 
@@ -784,23 +785,56 @@ end
 
 
 
-#=
+
+
 ####################################################################################################
 #                         Check learning with constant beliefs set at HA rational
 ####################################################################################################
+s = ArgParseSettings()
+@add_arg_table s begin
+    "i"
+        arg_type = Int
+        required = true
+        help = "indx going from 1 to 6"
+end
+ps = parse_args(s)
+indx = ps["i"]
+
+
+
 para = HAmodel(with_iid = true)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-para.T = 5_000
+para.T = 10_000
 para.agent_num = 100_000
-para.path = "simulations/keep_const"
-para.ψ̄ = [-6.54E-06; -0.588867813; -0.788101571]
+para.ψ_init = [-6.54E-06; -0.588867813; -0.788101571]' .* ones(para.agent_num)
 keep_const = true
+
+
+
+if indx == 1
+    para.path = "simulations/from_zeros/gain_0.005"
+elseif indx == 2
+    para.path = "simulations/from_zeros/gain_0.01"
+elseif indx == 3
+    para.path = "simulations/from_RA/gain_0.005"
+elseif indx == 4
+    para.path = "simulations/from_RA/gain_0.01"
+elseif indx == 5
+    para.path = "simulations/from_HA/gain_0.005"
+elseif indx == 6
+    para.path = "simulations/from_HA/gain_0.01"
+elseif indx == 7
+    para.path = "simulations/from_HA_ergodic/gain_0.005"
+    para.ψ_init = readdlm("../data/HA/with_iid/learning/simulations/from_HA/gain_0.005/psi/10000.csv", ',')
+elseif indx == 8
+    para.path = "simulations/from_HA_ergodic/gain_0.01"
+    para.ψ_init = readdlm("../data/HA/with_iid/learning/simulations/from_HA/gain_0.01/psi/10000.csv", ',')
+end
+
+
+
 simul_learning(para, π, keep_const)
 compute_coeffs(para)
-=#
-
-
-
 
 
 

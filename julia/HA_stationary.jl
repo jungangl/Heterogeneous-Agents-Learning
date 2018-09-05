@@ -81,10 +81,10 @@ end
     ## Simulation paramters
     T::Int64 = 150
     agent_num::Int64 = 10000
-    ψ̄::Vector{Float64} = [ -0.001314661;  -0.765090668;   -0.655607579]
     R̄::Matrix{Float64} = [ 1.0000000000   -0.000916309    -0.000362956;
                           -0.000916309     0.00120064      0.000473709;
                           -0.000362956     0.000473709     0.000482302]
+    ψ_init::Matrix{Float64} = [ -0.001314661;  -0.765090668;   -0.655607579]' .* ones(agent_num)
     path::String = "simulations/from_zeros/gain_0.005"
     with::String = if with_iid "with_iid" else "without_iid" end
 end
