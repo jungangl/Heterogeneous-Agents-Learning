@@ -114,7 +114,7 @@ end
         a′ = (1 + r) * a + A[s] * w * n - c
         ngrid[indx] = n * A[s]
         #check if aprime falls into the very first or very last bin
-        if a′ <= 0.0
+        if a′ <= a_min
             i′ = 1
             ω = 1.0
         #check if aprime falls into the very last bin

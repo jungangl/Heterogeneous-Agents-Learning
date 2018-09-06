@@ -69,7 +69,7 @@ end
     S::Int64 = length(A)
     N_ϕ::Int64 = 50
     ## Environment variables
-    a_min::Float64 = 0.
+    a_min::Float64 = -3.
     a_max::Float64 = 300.
     Na::Int64 = 150 #number of asset grid points for spline
     ϕ_min::Float64 = 0.
@@ -287,7 +287,12 @@ function construct_H(para::HAmodel, cf)
     ϵn_grid = zeros((N + 2) * S)
     n_grid = zeros((N + 2) * S)
     a_grid = zeros((N + 2) * S)
-    H = spzeros((N + 2) * S, (N + 2) * S)
+
+    Ivec = zeros(Int,(N + 2) * S * S * 2)
+    Jvec = zeros(Int,(N + 2) * S * S * 2)
+    Vvec = zeros((N + 2) * S * S * 2)
+    nS = 1 #number of elements used
+
     for k in 1:(N + 2) * S
         ## Transition to i′ with prob ω
         ## Transition to i′ + 1 with prob 1 - ω
@@ -303,7 +308,7 @@ function construct_H(para::HAmodel, cf)
         n_grid[k] = n
         a_grid[k] = a
         ## Check if a′ falls into the very first or very last bin
-        if a′ <= 0.0
+        if a′ <= a_min
             i′ = 1
             ω = 1.0
         ## Check if a′ falls into the very last bin
@@ -322,13 +327,18 @@ function construct_H(para::HAmodel, cf)
         for (iprime, prob) in zip([i′ i′ + 1], [ω 1 - ω])
             for sprime in 1:S
                 k′ = dimtrans2to1(N, iprime, sprime)
-                H[k, k′] = prob * P[s, sprime]
+                #H[k, k′] = prob * P[s, sprime]
+                Ivec[nS] = k
+                Jvec[nS] = k′
+                Vvec[nS] = prob * P[s, sprime]
+                nS += 1
             end
         end
     end
+
+    H = sparse(Ivec,Jvec,Vvec,(N + 2) * S,(N + 2) * S)
     return H, ϵn_grid, n_grid, a_grid
 end
-
 
 
 ## Compute the stationary distribution from the transition matrix for the states
@@ -371,8 +381,8 @@ end
 function calibrate_stationary(para)
     @unpack α, K2Y, n̄ = para
     K2EN = (K2Y) ^ (1 / (1 - α))
-    #res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
-    #para.β, para.χ = res.zero
+    res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
+    para.β, para.χ = res.zero
     diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid = stationary_resid([para.β, para.χ], α, K2Y, n̄, K2EN, para)
     para.ā = dot(π, a_grid)
     return para, π, K2EN, ϵn_grid, n_grid, a_grid
@@ -398,12 +408,16 @@ function wealth_dist(para, π)
 end
 
 
-
-#=
+println("testing")
 para = HAmodel(with_iid = true)
-@time para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-=#
-
+println(para.a_min)
+para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
+println("beta")
+println(para.β)
+println("χ")
+println(para.χ)
+data = para.β,para.χ,π, ϵn_grid, n_grid, a_grid
+writedlm("statdist.dat",data)
 
 
 #=
