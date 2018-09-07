@@ -43,13 +43,13 @@ end
     with_iid::Bool = true
     σ::Float64 = 2.
     γ::Float64 = 2.
-    β::Float64 = if with_iid 0.9817232017253373 else 0.9819212869380729 end
+    β::Float64 = if with_iid 0.9822509491118543 else 0.9819212869380729 end
     ρ::Float64 = 0.95
     σ_ϵ::Float64 = 0.007
     K2Y::Float64 = 10.26
     α::Float64 = 0.36
     δ::Float64 = 0.025
-    χ::Float64 = if with_iid 1.0933191294158184 else 1.293710294268282 end
+    χ::Float64 = if with_iid 1.1076741860637085 else 1.293710294268282 end
     γ_gain::Function  = t -> 0.02
     ## Steady state values
     ā::Float64 = 14.16447244048578
@@ -407,7 +407,7 @@ function wealth_dist(para, π)
     savefig(p2, "../figures/HA/$(with)/stationary/dist_over_a/wealth_high.pdf")
 end
 
-
+#=
 println("testing")
 para = HAmodel(with_iid = true)
 println(para.a_min)
@@ -418,7 +418,7 @@ println("χ")
 println(para.χ)
 data = para.β,para.χ,π, ϵn_grid, n_grid, a_grid
 writedlm("statdist.dat",data)
-
+=#
 
 #=
 filenames = ["pi", "en", "n", "a"]

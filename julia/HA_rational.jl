@@ -220,13 +220,13 @@ function solve_transition(para)
         end
         F[:] = results[:,1];
     end
-    k_trans = readdlm("../data/HA_rational/k_trans1sd.csv", ',')
+    #k_trans = readdlm("../data/HA_rational/k_trans1sd.csv", ',')
 
-    #initial_k = ones(T) * k̄
-    #initial_F = zeros(T)
-    #df = OnceDifferentiable(f!,j!,fj!,initial_k,initial_F)
-    #res = nlsolve(df,initial_k)
-    #k_trans = res.zero::Vector{Float64}
+    initial_k = ones(T) * k̄
+    initial_F = zeros(T)
+    df = OnceDifferentiable(f!,j!,fj!,initial_k,initial_F)
+    res = nlsolve(df,initial_k)
+    k_trans = res.zero::Vector{Float64}
 
     coeffs, R = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
     Ct, Nt, Kt = compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
@@ -306,7 +306,8 @@ end
 
 
 para = HAmodel()
+println(para.a_min)
 k_trans, coeffs, R, Ct, Nt, Kt = solve_transition(para)
-writedlm("../data/HA_rational/psi1sdtest.csv", coeffs, ',')
-writedlm("../data/HA_rational/R1sdtest.csv", R, ',')
-writedlm("../data/HA_rational/k_trans1sdtest.csv", k_trans, ',')
+writedlm("../data/HA_rational/psi1sd_amin.csv", coeffs, ',')
+writedlm("../data/HA_rational/R1sd_amin.csv", R, ',')
+writedlm("../data/HA_rational/k_trans1sd_amin.csv", k_trans, ',')
