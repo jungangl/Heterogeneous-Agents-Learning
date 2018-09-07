@@ -622,9 +622,8 @@ end
 
 
 ## Compute the coefficients from simulating learning with holding the beliefs at HA_rational
-function compute_coeffs(para)
+function compute_coeffs(para, t_start)
     @unpack T, agent_num, path, with, ā = para
-    coeffs = zeros(agent_num, 3)
     ν = zeros(T, agent_num)
     ν̄c = zeros(T, agent_num)
     a, θ = [zeros(T) for _ in 1:2]
@@ -635,13 +634,17 @@ function compute_coeffs(para)
         a[t] = readdlm("../data/HA/$(with)/learning/$(path)/mean_a/$(t).csv", ',')[1]
         θ[t] = readdlm("../data/HA/$(with)/learning/$(path)/theta/$(t).csv", ',')[1]
     end
-    RHS = [ones(T) log.((a / ā)) log.(θ)][1:T - 1, :]
-    for i in 1:agent_num
-        LHS = log.(ν[2:T, i] ./ ν̄c[2:T, i])
-        coeffs[i, :] = inv(RHS' * RHS) * (RHS' * LHS)
+    for t in t_start:T
+        println("t = $t")
+        coeffs = zeros(agent_num, 3)
+        RHS = [ones(T) log.((a / ā)) log.(θ)][1:t - 1, :]
+        for i in 1:agent_num
+            LHS = log.(ν[2:t, i] ./ ν̄c[2:t, i])
+            coeffs[i, :] = inv(RHS' * RHS) * (RHS' * LHS)
+        end
+        writedlm("../data/HA/$(with)/learning/$(path)/coeff/$(t).csv", coeffs, ',')
+        writedlm("../data/HA/$(with)/learning/$(path)/mean_coeff/$(t).csv", mean(coeffs, 1), ',')
     end
-    writedlm("../data/HA/$(with)/learning/$(path)/coeff/all_agents.csv", coeffs, ',')
-    writedlm("../data/HA/$(with)/learning/$(path)/coeff/mean_psi.csv", mean(coeffs, 1), ',')
 end
 
 
@@ -662,7 +665,7 @@ indx = ps["i"]
 
 
 
-para = HAmodel(with_iid = true)
+para = HAmodel(with_iid = true, lower_a_min = true)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 para.T = 10_000
 para.agent_num = 100_000
@@ -684,11 +687,11 @@ elseif indx == 4
     para.γ_gain = t -> 0.01
 elseif indx == 5
     para.path = "simulations/from_HA/gain_0.005"
-    para.ψ_init = [-6.54E-06; -0.588867813; -0.788101571]' .* ones(para.agent_num)
+    para.ψ_init = [-9479134003154144e-21; -0.6507580859823342; -0.7536267157354538]' .* ones(para.agent_num)
     para.γ_gain = t -> 0.005
 elseif indx == 6
     para.path = "simulations/from_HA/gain_0.01"
-    para.ψ_init = [-6.54E-06; -0.588867813; -0.788101571]' .* ones(para.agent_num)
+    para.ψ_init = [-9479134003154144e-21; -0.6507580859823342; -0.7536267157354538]' .* ones(para.agent_num)
     para.γ_gain = t -> 0.01
 end
 keep_const = false
@@ -804,14 +807,15 @@ indx = ps["i"]
 
 para = HAmodel(with_iid = true)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-para.T = 10_000
 para.agent_num = 100_000
+para.T = 10_000
 para.ψ_init = [-6.54E-06; -0.588867813; -0.788101571]' .* ones(para.agent_num)
 keep_const = true
-
-
-
-if indx == 1
+t_start = 50
+if indx == 0
+    para.T = 5_000
+    para.path = "simulations/keep_const"
+elseif indx == 1
     para.path = "simulations/from_zeros/gain_0.005"
 elseif indx == 2
     para.path = "simulations/from_zeros/gain_0.01"
@@ -824,23 +828,38 @@ elseif indx == 5
 elseif indx == 6
     para.path = "simulations/from_HA/gain_0.01"
 elseif indx == 7
+    para.T = 5_000
     para.path = "simulations/from_HA_ergodic/gain_0.005"
     para.ψ_init = readdlm("../data/HA/with_iid/learning/simulations/from_HA/gain_0.005/psi/10000.csv", ',')
 elseif indx == 8
+    para.T = 5_000
     para.path = "simulations/from_HA_ergodic/gain_0.01"
     para.ψ_init = readdlm("../data/HA/with_iid/learning/simulations/from_HA/gain_0.01/psi/10000.csv", ',')
 end
 
 
 
-simul_learning(para, π, keep_const)
-compute_coeffs(para)
+#simul_learning(para, π, keep_const)
+compute_coeffs(para, t_start)
 
 
 
+#=
+for from in ["from_zeros", "from_RA", "from_HA"]
+    for gain in ["gain_0.01", "gain_0.005"]
+        coeff = readdlm("../data/HA/with_iid/learning/simulations/$from/$gain/mean_coeff/combined.csv", ',')
+        p = plot(coeff, label = "", xlim = (50:1000:4000), title = "coeffs for $from and $gain")
+        savefig(p, "../figures/HA/with_iid/learning/simulations/coeff/$(from)_$(gain).png")
+    end
+end
+=#
 
 
-
+#=
+coeff = readdlm("../data/HA/with_iid/learning/simulations/keep_const/mean_coeff/combined.csv", ',')
+p = plot(coeff, label = "", xlim = (50:1000:4000), title = "coeffs for keep_const")
+savefig(p, "../figures/HA/with_iid/learning/simulations/coeff/keep_const.png")
+=#
 
 
 

@@ -41,15 +41,16 @@ end
 @with_kw type HAmodel
     ## Fundamental paramters
     with_iid::Bool = true
+    lower_a_min::Bool = false
     σ::Float64 = 2.
     γ::Float64 = 2.
-    β::Float64 = if with_iid 0.9822509491118543 else 0.9819212869380729 end
+    β::Float64 = if (with_iid && lower_a_min) 0.9822509491118543 elseif (with_iid && !lower_a_min) 0.9817232017253373 elseif (!with_iid)  0.9819212869380729 end
     ρ::Float64 = 0.95
     σ_ϵ::Float64 = 0.007
     K2Y::Float64 = 10.26
     α::Float64 = 0.36
     δ::Float64 = 0.025
-    χ::Float64 = if with_iid 1.1076741860637085 else 1.293710294268282 end
+    χ::Float64 = if (with_iid && lower_a_min) 1.1076741860637085 elseif (with_iid && !lower_a_min) 1.0933191294158184 elseif (!with_iid) 1.293710294268282 end
     γ_gain::Function  = t -> 0.02
     ## Steady state values
     ā::Float64 = 14.16447244048578
@@ -86,7 +87,7 @@ end
                           -0.000362956     0.000473709     0.000482302]
     ψ_init::Matrix{Float64} = [ -0.001314661;  -0.765090668;   -0.655607579]' .* ones(agent_num)
     path::String = "simulations/from_zeros/gain_0.005"
-    with::String = if with_iid "with_iid" else "without_iid" end
+    with::String = if (with_iid && lower_a_min) "lower_a_min" elseif (with_iid && !lower_a_min) "with_iid" elseif (!with_iid) "without_iid" end
 end
 
 
@@ -341,6 +342,7 @@ function construct_H(para::HAmodel, cf)
 end
 
 
+
 ## Compute the stationary distribution from the transition matrix for the states
 function stat_dist(para::HAmodel, k::Float64)
     tol = 1e-10
@@ -381,8 +383,8 @@ end
 function calibrate_stationary(para)
     @unpack α, K2Y, n̄ = para
     K2EN = (K2Y) ^ (1 / (1 - α))
-    res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
-    para.β, para.χ = res.zero
+    #res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
+    #para.β, para.χ = res.zero
     diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid = stationary_resid([para.β, para.χ], α, K2Y, n̄, K2EN, para)
     para.ā = dot(π, a_grid)
     return para, π, K2EN, ϵn_grid, n_grid, a_grid
@@ -391,7 +393,7 @@ end
 
 
 ## Plot the wealth distribution over a, make sure there is no bunching at a_max
-function wealth_dist(para, π)
+function save_wealth_dist(para, π)
     @unpack with = para
     agrid = collect(get_bins(para.a_min, para.a_max, para.N))
     πgrid = zeros(length(agrid))
@@ -407,18 +409,14 @@ function wealth_dist(para, π)
     savefig(p2, "../figures/HA/$(with)/stationary/dist_over_a/wealth_high.pdf")
 end
 
+
+
 #=
-println("testing")
-para = HAmodel(with_iid = true)
-println(para.a_min)
+para = HAmodel(with_iid = true, lower_a_min = true)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-println("beta")
-println(para.β)
-println("χ")
-println(para.χ)
-data = para.β,para.χ,π, ϵn_grid, n_grid, a_grid
-writedlm("statdist.dat",data)
 =#
+
+
 
 #=
 filenames = ["pi", "en", "n", "a"]
@@ -431,7 +429,7 @@ end
 
 
 #=
-wealth_dist(para, π)
+save_wealth_dist(para, π)
 p_c, p_n, p_aprime = plot_policies(para)
 savefig(p_c, "../figures/HA/$(para.with)/stationary/policies/c.pdf")
 savefig(p_n, "../figures/HA/$(para.with)/stationary/policies/n.pdf")
