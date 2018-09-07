@@ -11,14 +11,14 @@ end
 
 
 
-@everywhere function compute_cmin(para, w)
-  @unpack σ, γ, χ, A, S = para
+@everywhere function compute_cmin(para, w,r)
+  @unpack σ, γ, χ, A, S, a_min = para
   cmin = zeros(S)
   for s in 1:S
     function f(logc)
       c = exp(logc)
       n = 1 - ((w * A[s] * c .^ (-σ)) / χ) .^ (-1 / γ)
-      return c - A[s] * w * n
+      return c - A[s] * w * n - r*a_min
     end
     res = nlsolve(f, [0.]; inplace = false)
     cmin[s] = exp(res.zero[1])
@@ -30,7 +30,7 @@ end
 
 @everywhere function backward_cf(para, cf′, a′grid, r, r′, w)
     @unpack σ, γ, β, χ, P, A, S, a_min, k_spline = para
-    c_min = compute_cmin(para, w)
+    c_min = compute_cmin(para, w,r)
     n_con = 10
     N_a = length(a′grid)
     #preallocate for speed
@@ -306,6 +306,7 @@ end
 
 
 para = HAmodel()
+println("Fixed")
 println(para.a_min)
 k_trans, coeffs, R, Ct, Nt, Kt = solve_transition(para)
 writedlm("../data/HA_rational/psi1sd_amin.csv", coeffs, ',')
