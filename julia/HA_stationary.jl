@@ -44,16 +44,16 @@ end
     lower_a_min::Bool = false
     σ::Float64 = 2.
     γ::Float64 = 2.
-    β::Float64 = if (with_iid && lower_a_min) 0.9822509491118543 elseif (with_iid && !lower_a_min) 0.9817232017253373 elseif (!with_iid)  0.9819212869380729 end
+    β::Float64 = (with_iid&&lower_a_min) * 0.9822509491118543 + (with_iid&&!lower_a_min) * 0.9817232017253373 + (!with_iid) * 0.9819212869380729
     ρ::Float64 = 0.95
     σ_ϵ::Float64 = 0.007
     K2Y::Float64 = 10.26
     α::Float64 = 0.36
     δ::Float64 = 0.025
-    χ::Float64 = if (with_iid && lower_a_min) 1.1076741860637085 elseif (with_iid && !lower_a_min) 1.0933191294158184 elseif (!with_iid) 1.293710294268282 end
+    χ::Float64 = (with_iid && lower_a_min) * 1.1076741860637085 +  (with_iid&&!lower_a_min) * 1.0933191294158184 + (!with_iid) * 1.293710294268282
     γ_gain::Function  = t -> 0.02
     ## Steady state values
-    ā::Float64 = 14.16447244048578
+    ā::Float64 = -Inf
     r̄::Float64 = α * inv(K2Y) - δ
     w̄::Float64 = (1 - α) * (K2Y) ^ (α / (1 - α))
     n̄::Float64 = 1/3
@@ -70,7 +70,7 @@ end
     S::Int64 = length(A)
     N_ϕ::Int64 = 50
     ## Environment variables
-    a_min::Float64 = -3.
+    a_min::Float64 = lower_a_min * (-3.) + !lower_a_min * (0.)
     a_max::Float64 = 300.
     Na::Int64 = 150 #number of asset grid points for spline
     ϕ_min::Float64 = 0.
@@ -81,11 +81,13 @@ end
     c_min2::Vector{Float64} = similar(A)
     ## Simulation paramters
     T::Int64 = 150
-    agent_num::Int64 = 10000
+    agent_num::Int64 = 100_000
     R̄::Matrix{Float64} = [ 1.0000000000   -0.000916309    -0.000362956;
                           -0.000916309     0.00120064      0.000473709;
                           -0.000362956     0.000473709     0.000482302]
-    ψ_init::Matrix{Float64} = [ -0.001314661;  -0.765090668;   -0.655607579]' .* ones(agent_num)
+    ψ_init::Matrix{Float64} = (with_iid&&lower_a_min) *  ([-9479134003154144e-21;  -0.6507580859823342;   -0.7536267157354538]' .* ones(agent_num)) +
+                              (with_iid&&!lower_a_min) * ([-65371959700892504e-22;  -0.5888678128851162;   -0.7881015708220476]' .* ones(agent_num)) +
+                              (!with_iid) *              ([631641332070448e-21;  -0.6182321819968655;   -0.8522325608820616]' .* ones(agent_num))
     path::String = "simulations/from_zeros/gain_0.005"
     with::String = if (with_iid && lower_a_min) "lower_a_min" elseif (with_iid && !lower_a_min) "with_iid" elseif (!with_iid) "without_iid" end
 end
@@ -412,7 +414,7 @@ end
 
 
 #=
-para = HAmodel(with_iid = true, lower_a_min = true)
+para = HAmodel(with_iid = false, lower_a_min = false)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 =#
 

@@ -665,10 +665,8 @@ indx = ps["i"]
 
 
 
-para = HAmodel(with_iid = true, lower_a_min = true)
+para = HAmodel(with_iid = true, lower_a_min = true, agent_num = 100_000, T = 10_000)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-para.T = 10_000
-para.agent_num = 100_000
 if indx == 1
     para.path = "simulations/from_zeros/gain_0.005"
     para.ψ_init = zeros(3)' .* ones(para.agent_num)
@@ -687,11 +685,9 @@ elseif indx == 4
     para.γ_gain = t -> 0.01
 elseif indx == 5
     para.path = "simulations/from_HA/gain_0.005"
-    para.ψ_init = [-9479134003154144e-21; -0.6507580859823342; -0.7536267157354538]' .* ones(para.agent_num)
     para.γ_gain = t -> 0.005
 elseif indx == 6
     para.path = "simulations/from_HA/gain_0.01"
-    para.ψ_init = [-9479134003154144e-21; -0.6507580859823342; -0.7536267157354538]' .* ones(para.agent_num)
     para.γ_gain = t -> 0.01
 end
 keep_const = false
@@ -700,7 +696,7 @@ simul_learning(para, π, keep_const)
 
 
 
-#=
+
 ####################################################################################################
 #                           Plot beliefs evolution
 ####################################################################################################
@@ -733,7 +729,28 @@ for var in ["median", "mean"]
         savefig("../figures/HA/$(with)/learning/simulations/diff/$(var)/HA-RA_$(gain).png")
     end
 end
-=#
+
+
+with = "with_iid"
+for start in ["from_zeros", "from_RA", "from_HA"]
+    for gain in ["gain_0.005", "gain_0.01"]
+        psi = readdlm("../data/HA/$(with)/learning/simulations/$start/$gain/mean_psi/combined.csv", ',')[51:5001, :]
+        coeff = readdlm("../data/HA/$(with)/learning/simulations/$start/$gain/mean_coeff/combined.csv", ',')
+        plot(psi, label = "", yaxis = -1.2:0.2:0.4, ylim = (-1.2, 0.4), ls = :dash)
+        plot!(coeff, label = "", title = "coeffs $(start) and $(gain)")
+        savefig("../figures/HA/$(with)/learning/simulations/coeff/$(start)_$(gain).png")
+    end
+end
+psi = readdlm("../data/HA/$(with)/learning/simulations/from_HA/gain_0.005/mean_psi/combined.csv", ',')[51:5001, :]
+coeff = readdlm("../data/HA/$(with)/learning/simulations/keep_const/mean_coeff/combined.csv", ',')
+plot(psi, label = "", yaxis = -1.2:0.2:0.4, ylim = (-1.2, 0.4), ls = :dash)
+plot!(coeff, label = "", title = "coeffs keep_const")
+savefig("../figures/HA/$(with)/learning/simulations/coeff/keep_const.png")
+
+
+
+
+
 
 
 
@@ -789,7 +806,6 @@ end
 
 
 
-
 ####################################################################################################
 #                         Check learning with constant beliefs set at HA rational
 ####################################################################################################
@@ -805,11 +821,10 @@ indx = ps["i"]
 
 
 
-para = HAmodel(with_iid = true)
+para = HAmodel(with_iid = true, lower_a_min = true)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 para.agent_num = 100_000
 para.T = 10_000
-para.ψ_init = [-6.54E-06; -0.588867813; -0.788101571]' .* ones(para.agent_num)
 keep_const = true
 t_start = 50
 if indx == 0
@@ -831,16 +846,19 @@ elseif indx == 7
     para.T = 5_000
     para.path = "simulations/from_HA_ergodic/gain_0.005"
     para.ψ_init = readdlm("../data/HA/with_iid/learning/simulations/from_HA/gain_0.005/psi/10000.csv", ',')
+    t_start = 4486
 elseif indx == 8
     para.T = 5_000
     para.path = "simulations/from_HA_ergodic/gain_0.01"
     para.ψ_init = readdlm("../data/HA/with_iid/learning/simulations/from_HA/gain_0.01/psi/10000.csv", ',')
+    t_start = 4495
 end
 
 
 
 #simul_learning(para, π, keep_const)
 compute_coeffs(para, t_start)
+
 
 
 
