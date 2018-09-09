@@ -385,8 +385,8 @@ end
 function calibrate_stationary(para)
     @unpack α, K2Y, n̄ = para
     K2EN = (K2Y) ^ (1 / (1 - α))
-    #res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
-    #para.β, para.χ = res.zero
+    res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
+    para.β, para.χ = res.zero
     diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid = stationary_resid([para.β, para.χ], α, K2Y, n̄, K2EN, para)
     para.ā = dot(π, a_grid)
     return para, π, K2EN, ϵn_grid, n_grid, a_grid
@@ -405,16 +405,17 @@ function save_wealth_dist(para, π)
     end
     p1 = scatter(agrid[1:5], πgrid[1:5], label = "a", grid = false, title = "wealth distribtion for a in ($(agrid[1]), $(round(agrid[5], 2)))")
     p2 = scatter(agrid[6:end], πgrid[6:end], label = "a", title = "wealth distribution from a = $(agrid[6])", grid = false)
-    writedlm("../data/HA/$(with)/stationary/dist_over_a/a.csv", agrid, ',')
-    writedlm("../data/HA/$(with)/stationary/dist_over_a/pi.csv", πgrid, ',')
-    savefig(p1, "../figures/HA/$(with)/stationary/dist_over_a/wealth_low.pdf")
-    savefig(p2, "../figures/HA/$(with)/stationary/dist_over_a/wealth_high.pdf")
+    writedlm("../data/HA/$(with)/stationary/N$(para.N)/dist_over_a/a.csv", agrid, ',')
+    writedlm("../data/HA/$(with)/stationary/N$(para.N)/dist_over_a/pi.csv", πgrid, ',')
+    savefig(p1, "../figures/HA/$(with)/stationary/N$(para.N)/dist_over_a/wealth_low.pdf")
+    savefig(p2, "../figures/HA/$(with)/stationary/N$(para.N)/dist_over_a/wealth_high.pdf")
 end
 
+para = HAmodel(with_iid = true, lower_a_min = true, N = 3000)
 
 
 #=
-para = HAmodel(with_iid = false, lower_a_min = false)
+para = HAmodel(with_iid = true, lower_a_min = false)
 para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 =#
 
@@ -424,7 +425,7 @@ para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
 filenames = ["pi", "en", "n", "a"]
 data = π, ϵn_grid, n_grid, a_grid
 for (i, filename) in enumerate(filenames)
-    writedlm("../data/HA/$(para.with)/stationary/dist_over_a_s/$(filename).csv", data[i], ',')
+    writedlm("../data/HA/$(para.with)/stationary/N$(para.N)/dist_over_a_s/$(filename).csv", data[i], ',')
 end
 =#
 
@@ -433,7 +434,7 @@ end
 #=
 save_wealth_dist(para, π)
 p_c, p_n, p_aprime = plot_policies(para)
-savefig(p_c, "../figures/HA/$(para.with)/stationary/policies/c.pdf")
-savefig(p_n, "../figures/HA/$(para.with)/stationary/policies/n.pdf")
-savefig(p_aprime, "../figures/HA/$(para.with)/stationary/policies/aprime.pdf")
+savefig(p_c, "../figures/HA/$(para.with)/stationary/N$(para.N)/policies/c.pdf")
+savefig(p_n, "../figures/HA/$(para.with)/stationary/N$(para.N)/policies/n.pdf")
+savefig(p_aprime, "../figures/HA/$(para.with)/stationary/N$(para.N)/policies/aprime.pdf")
 =#

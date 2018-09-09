@@ -696,11 +696,11 @@ simul_learning(para, π, keep_const)
 
 
 
-
+#=
 ####################################################################################################
 #                           Plot beliefs evolution
 ####################################################################################################
-with = "with_iid"
+with = "lower_a_min"
 for start in ["from_zeros", "from_RA", "from_HA"]
     for gain in ["gain_0.005", "gain_0.01"]
         for var in ["median", "mean"]
@@ -746,7 +746,7 @@ coeff = readdlm("../data/HA/$(with)/learning/simulations/keep_const/mean_coeff/c
 plot(psi, label = "", yaxis = -1.2:0.2:0.4, ylim = (-1.2, 0.4), ls = :dash)
 plot!(coeff, label = "", title = "coeffs keep_const")
 savefig("../figures/HA/$(with)/learning/simulations/coeff/keep_const.png")
-
+=#
 
 
 
@@ -805,7 +805,7 @@ end
 
 
 
-
+#=
 ####################################################################################################
 #                         Check learning with constant beliefs set at HA rational
 ####################################################################################################
@@ -861,8 +861,6 @@ compute_coeffs(para, t_start)
 
 
 
-
-#=
 for from in ["from_zeros", "from_RA", "from_HA"]
     for gain in ["gain_0.01", "gain_0.005"]
         coeff = readdlm("../data/HA/with_iid/learning/simulations/$from/$gain/mean_coeff/combined.csv", ',')
@@ -870,15 +868,13 @@ for from in ["from_zeros", "from_RA", "from_HA"]
         savefig(p, "../figures/HA/with_iid/learning/simulations/coeff/$(from)_$(gain).png")
     end
 end
-=#
 
 
-#=
+
 coeff = readdlm("../data/HA/with_iid/learning/simulations/keep_const/mean_coeff/combined.csv", ',')
 p = plot(coeff, label = "", xlim = (50:1000:4000), title = "coeffs for keep_const")
 savefig(p, "../figures/HA/with_iid/learning/simulations/coeff/keep_const.png")
-=#
-
+#=
 
 
 
