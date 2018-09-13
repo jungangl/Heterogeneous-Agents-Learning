@@ -70,12 +70,12 @@ end
     S::Int64 = length(A)
     N_ϕ::Int64 = 50
     ## Environment variables
-    a_min::Float64 = lower_a_min * (-3.) + !lower_a_min * (0.)
+    a_min::Float64 = lower_a_min * (-10.) + !lower_a_min * (0.)
     a_max::Float64 = 300.
     Na::Int64 = 150 #number of asset grid points for spline
     ϕ_min::Float64 = 0.
     ϕ_max::Float64 = 0.
-    N::Int64 = 1500
+    N::Int64 = 5000
     k_spline::Int64 = 3
     c_min::Vector{Float64} = similar(A)
     c_min2::Vector{Float64} = similar(A)
@@ -92,7 +92,11 @@ end
     with::String = if (with_iid && lower_a_min) "lower_a_min" elseif (with_iid && !lower_a_min) "with_iid" elseif (!with_iid) "without_iid" end
 end
 
-
+function HAmodelyearly()
+    para = HAmodel(with_iid=true,lower_a_min=false,K2Y = 10.26/4,ρ_p = 0.9695,σ_p = sqrt(0.0384),δ = 0.1,ρ = 0.95^4,σ_ϵ = 0.014,a_max = 50.)
+    para.β = para.β^4
+    return para
+end
 
 #------------------------------------------------------------------------#
 ## Let r̄ and w̄ be the prices in the steady state
