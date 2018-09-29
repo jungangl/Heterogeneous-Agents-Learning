@@ -6,8 +6,8 @@ using FastGaussQuadrature
 
 
 ## Computes productivity process by approximating AR(1) + iid shock
-function computeProductivityProcess(ρ_p, σ_p, σ_e, Np, Nt, Ns, with_iid)
-    if with_iid
+function computeProductivityProcess(ρ_p, σ_p, σ_e, Np, Nt, Ns, iid)
+    if iid
         mc = rouwenhorst(Np, ρ_p, σ_p)::QuantEcon.MarkovChain{Float64,Array{Float64,2},StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}}
         P1 = mc.p
         e1 = mc.state_values
@@ -38,40 +38,54 @@ function construct_agrid(a_min, a_max, Na, curv = 1.7)
 end
 
 
+
 @with_kw type HAmodel
-    ## Fundamental paramters
-    with_iid::Bool = true
-    lower_a_min::Bool = false
+    ## Define control booleans
+    yearly::Bool = true
+    iid::Bool = true
+    high_amin::Bool = true
+    seed::Int64 = 1
+    from_zero::Bool = true
+    gain_low::Bool = true
+    ## Define paths
+    yearly_str::String = if yearly "yearly" else "quarterly" end
+    iid_str::String = if iid "iid" else "noiid" end
+    amin_str::String = if high_amin "high_amin" else "low_amin" end
+    from_str::String = if from_zero "from_zeros" else "from_rational_RA" end
+    gain_str::String = if gain_low "gain_0.005" else "gain_0.01" end
+    stat_path::String = "HA/$(yearly_str)/$(iid_str)_$(amin_str)/stationary"
+    lear_path::String = "HA/$(yearly_str)/$(iid_str)_$(amin_str)/learning/seed$(seed)/simulations/$(from_str)/$(gain_str)"
+    ## Calibration
     σ::Float64 = 2.
     γ::Float64 = 2.
-    β::Float64 = (with_iid&&lower_a_min) * 0.9822509491118543 + (with_iid&&!lower_a_min) * 0.9817232017253373 + (!with_iid) * 0.9819212869380729
-    ρ::Float64 = 0.95
-    σ_ϵ::Float64 = 0.007
-    K2Y::Float64 = 10.26
+    β::Float64 = readdlm("../data/$(stat_path)/calibration/beta.csv")[1]
+    ρ::Float64 = (yearly) * (0.95 ^ 4) + (!yearly) * (0.95)
+    σ_ϵ::Float64 = (yearly) * (0.014) + (!yearly) * (0.007)
+    K2Y::Float64 = (yearly) * (10.26 / 4) + (!yearly) * (10.26)
     α::Float64 = 0.36
-    δ::Float64 = 0.025
-    χ::Float64 = (with_iid && lower_a_min) * 1.1076741860637085 +  (with_iid&&!lower_a_min) * 1.0933191294158184 + (!with_iid) * 1.293710294268282
-    γ_gain::Function  = t -> 0.02
+    δ::Float64 = (yearly) * (0.1) + (!yearly) * (0.025)
+    χ::Float64 = readdlm("../data/$(stat_path)/calibration/chi.csv")[1]
+    γ_gain::Function = t -> (gain_low) * (0.005) + (!gain_low) * (0.01)
     ## Steady state values
     ā::Float64 = -Inf
     r̄::Float64 = α * inv(K2Y) - δ
     w̄::Float64 = (1 - α) * (K2Y) ^ (α / (1 - α))
-    n̄::Float64 = 1/3
+    n̄::Float64 = 1 / 3
     ## MarkovChain for the state variable s
-    ρ_p::Float64 = 0.9923 # persistence
-    σ_p::Float64 = 0.0983 # permanent shock standard deviation
+    ρ_p::Float64 = (yearly) * (0.9695) + (!yearly) * (0.9923) # persistence
+    σ_p::Float64 = (yearly) * sqrt(0.0384) + (!yearly) * (0.0983) # permanent shock standard deviation
     σ_e::Float64 = sqrt(0.053) # transitory shock standard deviation
     Np::Int64 = 7 # number of states for permanent shocks
     Nt::Int64 = 3 # number of states for transitory shocks
     Ns::Int64 = 11 # number of states without iid shocks
-    mc::MarkovChain = computeProductivityProcess(ρ_p, σ_p, σ_e, Np, Nt, Ns, with_iid)
+    mc::MarkovChain = computeProductivityProcess(ρ_p, σ_p, σ_e, Np, Nt, Ns, iid)
     P::Matrix{Float64} = mc.p
     A::Vector{Float64} = exp.(mc.state_values)
     S::Int64 = length(A)
     N_ϕ::Int64 = 50
     ## Environment variables
-    a_min::Float64 = lower_a_min * (-10.) + !lower_a_min * (0.)
-    a_max::Float64 = 300.
+    a_min::Float64 = (high_amin) * (0.) + (!high_amin) * (-0.8 * A[1] * w̄ / r̄)
+    a_max::Float64 = (yearly) * (50.) + (!yearly) * (300.)
     Na::Int64 = 150 #number of asset grid points for spline
     ϕ_min::Float64 = 0.
     ϕ_max::Float64 = 0.
@@ -80,23 +94,15 @@ end
     c_min::Vector{Float64} = similar(A)
     c_min2::Vector{Float64} = similar(A)
     ## Simulation paramters
-    T::Int64 = 150
+    T::Int64 = 10_000
     agent_num::Int64 = 100_000
-    R̄::Matrix{Float64} = [ 1.0000000000   -0.000916309    -0.000362956;
-                          -0.000916309     0.00120064      0.000473709;
-                          -0.000362956     0.000473709     0.000482302]
-    ψ_init::Matrix{Float64} = (with_iid&&lower_a_min) *  ([-9479134003154144e-21;  -0.6507580859823342;   -0.7536267157354538]' .* ones(agent_num)) +
-                              (with_iid&&!lower_a_min) * ([-65371959700892504e-22;  -0.5888678128851162;   -0.7881015708220476]' .* ones(agent_num)) +
-                              (!with_iid) *              ([631641332070448e-21;  -0.6182321819968655;   -0.8522325608820616]' .* ones(agent_num))
-    path::String = "simulations/from_zeros/gain_0.005"
-    with::String = if (with_iid && lower_a_min) "lower_a_min" elseif (with_iid && !lower_a_min) "with_iid" elseif (!with_iid) "without_iid" end
+    R̄::Matrix{Float64} = readdlm("../data/RA/$(yearly_str)/rational/R_cov.csv", ',')
+    ψ_init::Matrix{Float64} = (from_zero)  * zeros(agent_num, 3) +
+                              (!from_zero) * readdlm("../data/RA/$(yearly_str)/rational/psi.csv", ',')' .* ones(agent_num)
+
 end
 
-function HAmodelyearly()
-    para = HAmodel(with_iid=true,lower_a_min=false,K2Y = 10.26/4,ρ_p = 0.9695,σ_p = sqrt(0.0384),δ = 0.1,ρ = 0.95^4,σ_ϵ = 0.014,a_max = 50.)
-    para.β = para.β^4
-    return para
-end
+
 
 #------------------------------------------------------------------------#
 ## Let r̄ and w̄ be the prices in the steady state
@@ -120,7 +126,7 @@ function compute_cmin!(para)
       n = 1 - ((w̄ * A[s] * c .^ (-σ)) / χ) .^ (-1 / γ)
       return c - A[s] * w̄ * n - r̄ * a_min
     end
-    res = nlsolve(f, [0.]; inplace = false)
+    res = nlsolve(f, [0.]; inplace = false, iterations = 100_000)
     para.c_min[s] = exp.(res.zero[1])
   end
 end
@@ -235,22 +241,24 @@ end
 
 ## plot the policy functions
 function plot_policies(para)
-    @unpack σ, γ, β, χ, r̄, w̄, P, A, S, a_min, a_max, k_spline, c_min = para
+    @unpack σ, γ, β, χ, r̄, w̄, P, A, S, a_min, a_max, k_spline, c_min, stat_path = para
     cf = get_cf(para)
     p_c = plot(grid = false, xlabel = "a", ylabel = "c", title = "consumption policy")
-    for s in 1:para.S
+    for s in 1:S
         plot!(p_c, a -> cf[s](a), a_min, a_max, label = "s = $s")
     end
     p_n = plot(grid = false, xlabel = "a", ylabel = "n", title = "labor policy")
-    for s in 1:para.S
+    for s in 1:S
         plot!(p_n, a -> max(1 - ((w̄ * A[s] * cf[s](a) ^ (-σ)) / χ) ^ (-1 / γ), 0), a_min, a_max, label = "s = $s")
     end
     p_aprime = plot(grid = false, xlabel = "a", ylabel = "aprime", title = "aprime policy")
-    for s in 1:para.S
+    for s in 1:S
         plot!(p_aprime, a -> (1 + r̄) * a + A[s] * w̄ * max(1 - ((w̄ * A[s] * cf[s](a) ^ (-σ)) / χ) ^ (-1 / γ), 0) - cf[s](a),
               a_min, a_max, label = "s = $s")
     end
-    return p_c, p_n, p_aprime
+    savefig(p_c, "../figures/$(stat_path)/policies/c.pdf")
+    savefig(p_n, "../figures/$(stat_path)/policies/n.pdf")
+    savefig(p_aprime, "../figures/$(stat_path)/policies/aprime.pdf")
 end
 
 
@@ -343,14 +351,14 @@ function construct_H(para::HAmodel, cf)
         end
     end
 
-    H = sparse(Ivec,Jvec,Vvec,(N + 2) * S,(N + 2) * S)
+    H = sparse(Ivec, Jvec, Vvec, (N + 2) * S, (N + 2) * S)
     return H, ϵn_grid, n_grid, a_grid
 end
 
 
 
 ## Compute the stationary distribution from the transition matrix for the states
-function stat_dist(para::HAmodel, k::Float64)
+function stat_dist(para, k)
     tol = 1e-10
     #k as the KN ratio
     @unpack α, δ, S, N = para
@@ -363,6 +371,7 @@ function stat_dist(para::HAmodel, k::Float64)
     while diff > tol
         π_new = (π' * H)'
         diff = norm(π_new - π, Inf)
+        #println(diff)
         π = π_new
     end
     return π, ϵn_grid, n_grid, a_grid
@@ -377,7 +386,7 @@ function stationary_resid(x, α, K2Y, n̄, K2EN, para)
     ϵn = dot(ϵn_grid, π)
     n = dot(n_grid, π)
     K2EN = dot(a_grid, π) / ϵn
-    diff_K2Y = K2EN ^ (1 - α) - K2Y
+    diff_K2Y = max(K2EN, 0.) ^ (1 - α) - K2Y
     diff_n̄ = n - n̄
     println("diff_K2Y = $diff_K2Y, diff_n̄ = $diff_n̄")
     return diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid
@@ -386,11 +395,11 @@ end
 
 
 ## Calibrating for χ and β, targeting K2Y ratio and average working hours
-function calibrate_stationary(para)
+function calibrate_stationary!(para)
     @unpack α, K2Y, n̄ = para
     K2EN = (K2Y) ^ (1 / (1 - α))
-    res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
-    para.β, para.χ = res.zero
+    #res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
+    #para.β, para.χ = res.zero
     diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid = stationary_resid([para.β, para.χ], α, K2Y, n̄, K2EN, para)
     para.ā = dot(π, a_grid)
     return para, π, K2EN, ϵn_grid, n_grid, a_grid
@@ -400,45 +409,62 @@ end
 
 ## Plot the wealth distribution over a, make sure there is no bunching at a_max
 function save_wealth_dist(para, π)
-    @unpack with = para
-    agrid = collect(get_bins(para.a_min, para.a_max, para.N))
+    @unpack a_min, a_max, N, stat_path = para
+    agrid = collect(get_bins(a_min, a_max, N))
     πgrid = zeros(length(agrid))
     for k in 1:length(π)
-        i, s = dimtrans1to2(para.N, k)
+        i, s = dimtrans1to2(N, k)
         πgrid[i] = πgrid[i] + π[k]
     end
     p1 = scatter(agrid[1:5], πgrid[1:5], label = "a", grid = false, title = "wealth distribtion for a in ($(agrid[1]), $(round(agrid[5], 2)))")
     p2 = scatter(agrid[6:end], πgrid[6:end], label = "a", title = "wealth distribution from a = $(agrid[6])", grid = false)
-    writedlm("../data/HA/$(with)/stationary/N$(para.N)/dist_over_a/a.csv", agrid, ',')
-    writedlm("../data/HA/$(with)/stationary/N$(para.N)/dist_over_a/pi.csv", πgrid, ',')
-    savefig(p1, "../figures/HA/$(with)/stationary/N$(para.N)/dist_over_a/wealth_low.pdf")
-    savefig(p2, "../figures/HA/$(with)/stationary/N$(para.N)/dist_over_a/wealth_high.pdf")
+    writedlm("../data/$(stat_path)/over_a/a.csv", agrid, ',')
+    writedlm("../data/$(stat_path)/over_a/pi.csv", πgrid, ',')
+    savefig(p1, "../figures/$(stat_path)/over_a/wealth_low.pdf")
+    savefig(p2, "../figures/$(stat_path)/over_a/wealth_high.pdf")
 end
 
-para = HAmodel(with_iid = true, lower_a_min = true, N = 3000)
 
 
 #=
-para = HAmodel(with_iid = true, lower_a_min = false)
-para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-=#
-
-
-
-#=
+####################################################################################################
+#                         Check learning with constant beliefs set at HA rational
+####################################################################################################
 filenames = ["pi", "en", "n", "a"]
-data = π, ϵn_grid, n_grid, a_grid
-for (i, filename) in enumerate(filenames)
-    writedlm("../data/HA/$(para.with)/stationary/N$(para.N)/dist_over_a_s/$(filename).csv", data[i], ',')
+for yearly in [true; false]
+    for iid in [true; false]
+        for high_amin in [true; false]
+            println("yearly: $(yearly), iid: $(iid), high_amin: $(high_amin)")
+            para = HAmodel(yearly = yearly, iid = iid, high_amin = high_amin)
+            para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary!(para)
+            println("β: $(para.β), χ: $(para.χ)")
+            ## Save calibrated β and χ
+            writedlm("../data/$(para.stat_path)/calibration/beta.csv", para.β, ',')
+            writedlm("../data/$(para.stat_path)/calibration/chi.csv", para.χ, ',')
+            ## Save two dimensional data over a and s
+            data = π, ϵn_grid, n_grid, a_grid
+            for (i, filename) in enumerate(filenames)
+                writedlm("../data/$(para.stat_path)/over_a_s/$(filename).csv", data[i], ',')
+            end
+            ## Save one dimensional data over a
+            save_wealth_dist(para, π)
+            ## Plot the policy rules for c, n and aprime
+            plot_policies(para)
+        end
+    end
 end
 =#
 
 
-
 #=
-save_wealth_dist(para, π)
-p_c, p_n, p_aprime = plot_policies(para)
-savefig(p_c, "../figures/HA/$(para.with)/stationary/N$(para.N)/policies/c.pdf")
-savefig(p_n, "../figures/HA/$(para.with)/stationary/N$(para.N)/policies/n.pdf")
-savefig(p_aprime, "../figures/HA/$(para.with)/stationary/N$(para.N)/policies/aprime.pdf")
+for yearly in [true; false]
+    for iid in [true; false]
+        for high_amin in [true; false]
+            println("yearly: $(yearly), iid: $(iid), high_amin: $(high_amin)")
+            para = HAmodel(yearly = yearly, iid = iid, high_amin = high_amin)
+            para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary!(para)
+            println("β: $(para.β), χ: $(para.χ)")
+        end
+    end
+end
 =#

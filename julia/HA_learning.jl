@@ -2,31 +2,30 @@ include("HA_stationary.jl")
 
 
 
-
 ## Define the function that write as the code runs
-function write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, str, with)
-    writedlm("../data/HA/$(with)/learning/$str/a/$t.csv", a, ',')
-    writedlm("../data/HA/$(with)/learning/$str/mean_a/$t.csv", mean(a), ',')
-    writedlm("../data/HA/$(with)/learning/$str/c/$t.csv", c, ',')
-    writedlm("../data/HA/$(with)/learning/$str/mean_c/$t.csv", mean(c), ',')
-    writedlm("../data/HA/$(with)/learning/$str/n/$t.csv", n, ',')
-    writedlm("../data/HA/$(with)/learning/$str/mean_n/$t.csv", mean(n), ',')
-    writedlm("../data/HA/$(with)/learning/$str/nu/$t.csv", ν, ',')
-    writedlm("../data/HA/$(with)/learning/$str/mean_nu/$t.csv", mean(ν), ',')
-    writedlm("../data/HA/$(with)/learning/$str/nu_bar/$t.csv", ν̄, ',')
-    writedlm("../data/HA/$(with)/learning/$str/mean_nu_bar/$t.csv", mean(ν̄), ',')
-    writedlm("../data/HA/$(with)/learning/$str/nu_bar_c/$t.csv", ν̄c, ',')
-    writedlm("../data/HA/$(with)/learning/$str/mean_nu_bar_c/$t.csv", mean(ν̄c), ',')
-    writedlm("../data/HA/$(with)/learning/$str/psi/$t.csv", ψ, ',')
-    writedlm("../data/HA/$(with)/learning/$str/mean_psi/$t.csv", mean(ψ, 1), ',')
-    writedlm("../data/HA/$(with)/learning/$str/median_psi/$t.csv", median(ψ, 1), ',')
-    writedlm("../data/HA/$(with)/learning/$str/r/$t.csv", r, ',')
-    writedlm("../data/HA/$(with)/learning/$str/R_cov/$t.csv", R, ',')
-    writedlm("../data/HA/$(with)/learning/$str/s/$t.csv", s, ',')
-    writedlm("../data/HA/$(with)/learning/$str/mean_s/$t.csv", mean(s), ',')
-    writedlm("../data/HA/$(with)/learning/$str/theta/$t.csv", θ, ',')
-    writedlm("../data/HA/$(with)/learning/$str/w/$t.csv", w, ',')
-    writedlm("../data/HA/$(with)/learning/$str/x/$t.csv", x, ',')
+function write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, lear_path)
+    writedlm("../data/$(lear_path)/a/$t.csv", a, ',')
+    writedlm("../data/$(lear_path)/mean_a/$t.csv", mean(a), ',')
+    writedlm("../data/$(lear_path)/c/$t.csv", c, ',')
+    writedlm("../data/$(lear_path)/mean_c/$t.csv", mean(c), ',')
+    writedlm("../data/$(lear_path)/n/$t.csv", n, ',')
+    writedlm("../data/$(lear_path)/mean_n/$t.csv", mean(n), ',')
+    writedlm("../data/$(lear_path)/nu/$t.csv", ν, ',')
+    writedlm("../data/$(lear_path)/mean_nu/$t.csv", mean(ν), ',')
+    writedlm("../data/$(lear_path)/nu_bar/$t.csv", ν̄, ',')
+    writedlm("../data/$(lear_path)/mean_nu_bar/$t.csv", mean(ν̄), ',')
+    writedlm("../data/$(lear_path)/nu_bar_c/$t.csv", ν̄c, ',')
+    writedlm("../data/$(lear_path)/mean_nu_bar_c/$t.csv", mean(ν̄c), ',')
+    writedlm("../data/$(lear_path)/psi/$t.csv", ψ, ',')
+    writedlm("../data/$(lear_path)/mean_psi/$t.csv", mean(ψ, 1), ',')
+    writedlm("../data/$(lear_path)/median_psi/$t.csv", median(ψ, 1), ',')
+    writedlm("../data/$(lear_path)/r/$t.csv", r, ',')
+    writedlm("../data/$(lear_path)/R_cov/$t.csv", R, ',')
+    writedlm("../data/$(lear_path)/s/$t.csv", s, ',')
+    writedlm("../data/$(lear_path)/mean_s/$t.csv", mean(s), ',')
+    writedlm("../data/$(lear_path)/theta/$t.csv", θ, ',')
+    writedlm("../data/$(lear_path)/w/$t.csv", w, ',')
+    writedlm("../data/$(lear_path)/x/$t.csv", x, ',')
 end
 
 
@@ -53,7 +52,7 @@ function compute_cmin2!(para, r, w, cf)
           n = 1 - ((w * A[s] * c .^ (-σ)) / χ) .^ (-1 / γ)
           return c - A[s] * w * n - r * a_min
       end
-      res = nlsolve(f, [0.]; inplace = false)
+      res = nlsolve(f, [log(1.)]; inplace = false)
       para.c_min2[s] = exp.(res.zero[1])
   end
 end
@@ -68,7 +67,7 @@ function get_cf2(para, cf, r, w)
     n_con = 10
     compute_cmin2!(para, r, w, cf)
     @unpack σ, γ, β, χ, r̄, w̄, P, A, S, c_min2, k_spline = para
-    @unpack a_min, a_max, Na, ϕ_min, ϕ_max, N_ϕ, path, with= para
+    @unpack a_min, a_max, Na, ϕ_min, ϕ_max, N_ϕ, lear_path = para
     ϕ_vec = linspace(ϕ_min, ϕ_max, N_ϕ)
     cf2 = Spline2D[]
     a′grid = construct_agrid(a_min,a_max,Na)
@@ -116,27 +115,10 @@ function get_cf2(para, cf, r, w)
             #If the constraint never binds don't need extra grid points
             if c_grid[s, i_ϕ, 1] == -Inf
                 start_i = find(a_grid[s, i_ϕ, :] .< a_min)[end]
-                try
-                    cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, start_i:end], c_grid[s , i_ϕ, start_i:end]; k = k_spline)(a′grid)
-                catch err
-                    if isa(err, LoadError)
-                        sort_indx = sortperm(a_grid[s, i_ϕ, start_i:end])
-                        x_vec = (a_grid[s, i_ϕ, start_i:end])[sort_indx]
-                        y_vec = (c_grid[s , i_ϕ, start_i:end])[sort_indx]
-                        cvec[:, i_ϕ] .= Spline1D(x_vec, y_vec; k = k_spline)(a′grid)
-                        output = vcat([r w], [s ϕ_vec[i_ϕ]], hcat(a_grid[s, i_ϕ, start_i:end], c_grid[s , i_ϕ, start_i:end]))
-                        writedlm("../data/HA/$(with)/learning/simulations/$path/spline/$(now()).csv", output, ',')
-                    end
-                end
+                cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, start_i:end], c_grid[s , i_ϕ, start_i:end]; k = k_spline)(a′grid)
             #If the constraint binds binds need to use all the grid points
             else
-                try
-                    cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, :], c_grid[s, i_ϕ, :]; k = k_spline)(a′grid)
-                catch err
-                    if isa(err, LoadError)
-                        cvec[:, i_ϕ] .= Spline1D(sort(a_grid[s, i_ϕ, :]), sort(c_grid[s, i_ϕ, :]); k = k_spline)(a′grid)
-                    end
-                end
+                cvec[:, i_ϕ] .= Spline1D(a_grid[s, i_ϕ, :], c_grid[s, i_ϕ, :]; k = k_spline)(a′grid)
             end
         end
         cf2[s] = Spline2D(a′grid, ϕ_vec, cvec)
@@ -291,28 +273,20 @@ end
 
 
 ## Update the variance-covariance matrix for least square learning
-function update_R(R, x, t, γ_gain, keep_const)
+function update_R(R, x, t, γ_gain)
     R′ = zeros(3, 3)
-    if keep_const == false
-        R′ = R + γ_gain(t) .* (x * x' - R)
-        @assert det(R′) != 0 "det(R′) = 0!"
-    else
-        R′ = R
-    end
+    R′ = R + γ_gain(t) .* (x * x' - R)
+    @assert det(R′) != 0 "det(R′) = 0!"
     return R′
 end
 
 
 
 ## Update the beliefs for all of the agents based on least square learning
-function update_ψ(ψ, R′, x, ν, t, γ_gain, agent_num, ν̄c, keep_const)
+function update_ψ(ψ, R′, x, ν, t, γ_gain, agent_num, ν̄c)
     ψ′ = zeros(agent_num, 3)
-    if keep_const == false
-        for i in 1:agent_num
-            ψ′[i, :] = ψ[i, :] + γ_gain(t) .* inv(R′) * x .* (log(ν[i] / ν̄c[i]) - ψ[i,:]' * x)[1]
-        end
-    else
-        ψ′ = ψ
+    for i in 1:agent_num
+        ψ′[i, :] = ψ[i, :] + γ_gain(t) .* inv(R′) * x .* (log(ν[i] / ν̄c[i]) - ψ[i,:]' * x)[1]
     end
     return ψ′
 end
@@ -382,8 +356,8 @@ end
 ## 2. ν̄i_t - expected future marginal utility ν̄,
 ## 3. ν̄ci_t - current marginal utility in steady state ν̄c
 ## 4. x_t - vector of aggregate states [1; log(mean(a) / ā); log(θ_t[t])]
-function simul_learning(para, π, keep_const)
-    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ_init, R̄, path, with = para
+function simul_learning(para, π)
+    @unpack N, a_min, a_max, agent_num, T, ā, ρ, σ_ϵ, γ_gain, ψ_init, R̄, lear_path = para
     ## Initialize functions
     cf = get_cf(para)
     bin_midpts = get_bins(a_min, a_max, N)
@@ -399,12 +373,12 @@ function simul_learning(para, π, keep_const)
     for t in 1:T
         println(t)
         c, n, a′, ν, ν̄, ν̄c, r, w = TE(para, a, s, ψ, x, cf)
-        write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, path, with)
+        write_data(a, c, n, ν, ν̄, ν̄c, ψ, r, R, s, θ, w, x, t, lear_path)
         if t == T break end
         s′ = update_s(para, s, t)
         θ′ = drawθ(θ, σ_ϵ, ρ)
         x′ = [1; log(mean(a′) / ā); log(θ′)]
-        R′ = update_R(R, x, t - 1, γ_gain, keep_const)
+        R′ = update_R(R, x, t - 1, γ_gain)
         if t == 1
             ψ′ = ψ
         else
@@ -414,7 +388,7 @@ function simul_learning(para, π, keep_const)
             ## Since this is a forcasting model,
             ## The right hand side is the data of "x" up to time t - 1
             ## The left hand side is "log(ν)" up to time t
-            ψ′ = update_ψ(ψ, R, x_, ν, t, γ_gain, agent_num, ν̄c, keep_const)
+            ψ′ = update_ψ(ψ, R, x_, ν, t, γ_gain, agent_num, ν̄c)
             x_ = x
         end
         a, s, θ, x, R, ψ = a′, s′, θ′, x′, R′, ψ′
@@ -447,10 +421,9 @@ end
 
 ## Simulate the economy from aggregate productivity shock vector θ_t
 ## Boolean het controls the heterogeneity of beliefs initialzed
-## Boolean keep_const controls if the beliefs update over time
 ## Return variables of interest: averge (consumptions, labors, assets, marginal utilitys, beliefs),
 ## and interest rates and wages.
-function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
+function simul_irf(para, θ_t, gain, t_sample, prepost)
     @unpack N, a_min, a_max, agent_num, ā, ρ, σ_ϵ, γ_gain, ψ_init, R̄, path, with = para
     T = length(θ_t)
     ## Initialize functions
@@ -473,7 +446,7 @@ function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
         s′ = update_s(para, s, t)
         θ′ = θ_t[t + 1]
         x′ = [1; log(mean(a′) / ā); log(θ′)]
-        R′ = update_R(R, x, t - 1, γ_gain, keep_const)
+        R′ = update_R(R, x, t - 1, γ_gain)
         if t == 1
             ψ′ = ψ
         else
@@ -483,7 +456,7 @@ function simul_irf(para, θ_t, gain, t_sample, prepost, keep_const)
             ## Since this is a forcasting model,
             ## The right hand side is the data of "x" up to time t - 1
             ## The left hand side is "log(ν)" up to time t
-            ψ′ = update_ψ(ψ, R, x_, ν, t, γ_gain, agent_num, ν̄c, keep_const)
+            ψ′ = update_ψ(ψ, R, x_, ν, t, γ_gain, agent_num, ν̄c)
             x_ = x
         end
         a, s, θ, x, R, ψ = a′, s′, θ′, x′, R′, ψ′
@@ -497,13 +470,13 @@ end
 ## Period of the simulation is Sim_T, the shock enters at t = shock_enter
 ## The shock decays with rate of para.ρ
 function IRFs(para, gain, t_sample, Sim_T)
-    keep_const = false
+    para.γ_gain = t -> 0.
     shock_enter = 1
     θ_t′, θ_t = [ones(Sim_T) for _ in 1:2]
     θ_t′[shock_enter:end] = exp.([para.σ_ϵ * para.ρ ^ (t - shock_enter) for t in shock_enter:Sim_T])
     ## Case with initialization of heterogeneous beliefs
-    simul_irf(para, θ_t′, gain, t_sample, "post", keep_const)
-    simul_irf(para, θ_t, gain, t_sample, "pre", keep_const)
+    simul_irf(para, θ_t′, gain, t_sample, "post")
+    simul_irf(para, θ_t, gain, t_sample, "pre")
 end
 
 
@@ -649,7 +622,7 @@ end
 
 
 
-#=
+
 ####################################################################################################
 #                            Long simulations with learning
 ####################################################################################################
@@ -665,34 +638,20 @@ indx = ps["i"]
 
 
 
-para = HAmodel(with_iid = true, lower_a_min = true, agent_num = 100_000, T = 10_000)
-para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
-if indx == 1
-    para.path = "simulations/from_zeros/gain_0.005"
-    para.ψ_init = zeros(3)' .* ones(para.agent_num)
-    para.γ_gain = t -> 0.005
-elseif indx == 2
-    para.path = "simulations/from_zeros/gain_0.01"
-    para.ψ_init = zeros(3)' .* ones(para.agent_num)
-    para.γ_gain = t -> 0.01
-elseif indx == 3
-    para.path = "simulations/from_RA/gain_0.005"
-    para.ψ_init = [-0.00131466; -0.765091; -0.655608]' .* ones(para.agent_num)
-    para.γ_gain = t -> 0.005
-elseif indx == 4
-    para.path = "simulations/from_RA/gain_0.01"
-    para.ψ_init = [-0.00131466; -0.765091; -0.655608]' .* ones(para.agent_num)
-    para.γ_gain = t -> 0.01
-elseif indx == 5
-    para.path = "simulations/from_HA/gain_0.005"
-    para.γ_gain = t -> 0.005
-elseif indx == 6
-    para.path = "simulations/from_HA/gain_0.01"
-    para.γ_gain = t -> 0.01
-end
-keep_const = false
-simul_learning(para, π, keep_const)
-=#
+int_vec = Bool.([parse.(Int, bin(indx, 6)[i]) for i in 1:6])
+yearly, iid, high_amin, seed, from_zero, gain_low = int_vec
+seed = seed + 1
+println("i=$indx, yearly=$yearly, iid=$iid, high_amin=$high_amin, seed=$seed, from_zero=$from_zero, gain_low=$gain_low")
+para = HAmodel(yearly = yearly, iid = iid, high_amin = high_amin, seed = seed, from_zero = from_zero, gain_low = gain_low)
+para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary!(para)
+simul_learning(para, π)
+
+
+
+
+
+
+
 
 
 
@@ -706,7 +665,7 @@ for start in ["from_zeros", "from_RA", "from_HA"]
         for var in ["median", "mean"]
             psi = readdlm("../data/HA/$(with)/learning/simulations/$start/$gain/$(var)_psi/combined.csv", ',')
             plot(psi, label = "", title = "$start $gain", xlabel = "Time", ylabel = "$(var) Beliefs")
-            plot!(ones(size(psi, 1), 1) .* [-6.54E-06 -0.588867813 -0.788101571], label = "", ls = :dash)
+            plot!(ones(size(psi, 1), 1) .* [-9479134003154144e-21  -0.6507580859823342   -0.7536267157354538], label = "", ls = :dash)
             savefig("../figures/HA/$(with)/learning/simulations/$var/$(start)_$(gain).pdf")
         end
     end
@@ -774,7 +733,7 @@ indx = ps["i"]
 srand(1)
 samples = sort(sample(5001:10000, 500, replace = false))
 para = HAmodel(with_iid = true)
-para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
+para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary!(para)
 para.agent_num = 100_000
 Sim_T = 200
 gain = ""
@@ -805,7 +764,7 @@ end
 
 
 
-#=
+
 ####################################################################################################
 #                         Check learning with constant beliefs set at HA rational
 ####################################################################################################
@@ -821,11 +780,10 @@ indx = ps["i"]
 
 
 
-para = HAmodel(with_iid = true, lower_a_min = true)
-para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary(para)
+para = HAmodel(with_iid = true, lower_a_min = false, γ_gain = t -> 0)
+para, π, k, ϵn_grid, n_grid, a_grid = calibrate_stationary!(para)
 para.agent_num = 100_000
 para.T = 10_000
-keep_const = true
 t_start = 50
 if indx == 0
     para.T = 5_000
@@ -856,14 +814,14 @@ end
 
 
 
-#simul_learning(para, π, keep_const)
+#simul_learning(para, π)
 compute_coeffs(para, t_start)
 
 
 
 for from in ["from_zeros", "from_RA", "from_HA"]
     for gain in ["gain_0.01", "gain_0.005"]
-        coeff = readdlm("../data/HA/with_iid/learning/simulations/$from/$gain/mean_coeff/combined.csv", ',')
+        coeff = readdlm("../data/HA/$(para.with)/learning/simulations/$from/$gain/mean_coeff/combined.csv", ',')
         p = plot(coeff, label = "", xlim = (50:1000:4000), title = "coeffs for $from and $gain")
         savefig(p, "../figures/HA/with_iid/learning/simulations/coeff/$(from)_$(gain).png")
     end
@@ -871,10 +829,10 @@ end
 
 
 
-coeff = readdlm("../data/HA/with_iid/learning/simulations/keep_const/mean_coeff/combined.csv", ',')
+coeff = readdlm("../data/HA/$(para.with)/learning/simulations/keep_const/mean_coeff/combined.csv", ',')
 p = plot(coeff, label = "", xlim = (50:1000:4000), title = "coeffs for keep_const")
 savefig(p, "../figures/HA/with_iid/learning/simulations/coeff/keep_const.png")
-#=
+
 
 
 

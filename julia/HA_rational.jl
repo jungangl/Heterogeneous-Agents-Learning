@@ -1,4 +1,4 @@
-addprocs(20)
+addprocs(25)
 @everywhere include("HA_stationary.jl")
 
 
@@ -16,12 +16,12 @@ end
   cmin = zeros(S)
   for s in 1:S
     function f(logc)
-      c = exp.(logc)
+      c = exp(logc)
       n = 1 - ((w * A[s] * c .^ (-σ)) / χ) .^ (-1 / γ)
       return c - A[s] * w * n - r*a_min
     end
     res = nlsolve(f, [0.]; inplace = false)
-    cmin[s] = exp.(res.zero[1])
+    cmin[s] = exp(res.zero[1])
   end
   return cmin
 end
@@ -172,7 +172,7 @@ end
 
 function solve_transition(para)
     @unpack a_min, a_max, ρ, α, δ, S = para
-    T = 150
+    T = 300
     lnθ₀ = 1*para.σ_ϵ
     lnθt = [lnθ₀ * ρ .^ (t - 1) for t in 1:T + 1]
     θt = exp.(lnθt) # running from time 0 to T
@@ -305,11 +305,10 @@ end
 
 
 
-para = HAmodelyearly()
-print("yearly")
-println(para.N)
+para = HAmodel()
+println("Fixed")
 println(para.a_min)
 k_trans, coeffs, R, Ct, Nt, Kt = solve_transition(para)
-writedlm("../data/HA_rational/psi1sd_yearly.csv", coeffs, ',')
-writedlm("../data/HA_rational/R1sd_yearly.csv", R, ',')
-writedlm("../data/HA_rational/k_trans1sd_yearly.csv", k_trans, ',')
+writedlm("../data/HA_rational/psi1sd_amin.csv", coeffs, ',')
+writedlm("../data/HA_rational/R1sd_amin.csv", R, ',')
+writedlm("../data/HA_rational/k_trans1sd_amin.csv", k_trans, ',')
