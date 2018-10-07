@@ -1,5 +1,6 @@
-addprocs(25)
+#addprocs(25)
 @everywhere include("HA_stationary.jl")
+using DataFrames
 
 
 
@@ -16,12 +17,12 @@ end
   cmin = zeros(S)
   for s in 1:S
     function f(logc)
-      c = exp(logc)
+      c = exp.(logc)
       n = 1 - ((w * A[s] * c .^ (-σ)) / χ) .^ (-1 / γ)
       return c - A[s] * w * n - r*a_min
     end
     res = nlsolve(f, [0.]; inplace = false)
-    cmin[s] = exp(res.zero[1])
+    cmin[s] = exp.(res.zero[1])
   end
   return cmin
 end
@@ -101,6 +102,7 @@ end
     @unpack N, S, α, a_min, a_max, A, χ, γ, σ, P = para
     bin_midpts = get_bins(a_min, a_max, N)
     ngrid = zeros((N + 2) * S)
+    hgrid = zeros((N + 2) * S)
     π′ = zeros(length(π))
     for indx in 1:length(π)
         #transition to iprime with prob ω
@@ -113,6 +115,7 @@ end
         n = max(1 - ((w * A[s] * c ^ (-σ)) / χ) ^ (-1 / γ), 0)
         a′ = (1 + r) * a + A[s] * w * n - c
         ngrid[indx] = n * A[s]
+        hgrid[indx] = n
         #check if aprime falls into the very first or very last bin
         if a′ <= a_min
             i′ = 1
@@ -136,24 +139,26 @@ end
             end
         end
     end
-    return π′, ngrid
+    return π′,ngrid,hgrid
 end
 
 
 
-@everywhere function get_πt(para, cft, rt, wt, π̄, n̄grid, T)
+@everywhere function get_πt(para, cft, rt, wt, π̄, n̄grid,h̄grid, T)
     @unpack S, N = para
     πt = zeros(length(π̄), T + 1)
     ngrid_t = zeros((N + 2) * S, T + 1)
+    hgrid_t = zeros((N + 2) * S, T + 1)
     πt[:, 1] = π̄
     # forwards compute the evolution of distribution π
     for t in 1:T
         r = rt[t]
         w = wt[t]
-        πt[:, t + 1], ngrid_t[:, t] = next_π(para, πt[:, t], cft[:, t], r, w)
+        πt[:, t + 1],ngrid_t[:, t], hgrid_t[:,t] = next_π(para, πt[:, t], cft[:, t], r, w)
     end
     ngrid_t[:, T + 1] = n̄grid
-    return πt, ngrid_t
+    hgrid_t[:, T + 1] = h̄grid
+    return πt, ngrid_t, hgrid_t
 end
 
 
@@ -172,18 +177,18 @@ end
 
 function solve_transition(para)
     @unpack a_min, a_max, ρ, α, δ, S = para
-    T = 300
+    T = 150
     lnθ₀ = 1*para.σ_ϵ
     lnθt = [lnθ₀ * ρ .^ (t - 1) for t in 1:T + 1]
     θt = exp.(lnθt) # running from time 0 to T
-    para, π̄, k̄, n̄grid,_, agrid = calibrate_stationary(para)
+    para, π̄, k̄, n̄grid,h̄grid, agrid = calibrate_stationary!(para)
     cf_ss = get_cf(para)
     function f(k)
         k = vcat(k, k̄) #running from time 0 to T
         rt = α * θt .* k .^ (α - 1) - δ
         wt = (1 - α) * θt .* k .^ α
         cft = get_cft(para, T, rt, wt, cf_ss)
-        πt, ngrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid, T)
+        πt, ngrid_t, hgrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid,h̄grid, T)
         k̂ = realized_kpath(πt, ngrid_t, agrid)
         diff = norm(k[1:T] - k̂[1:T], Inf)
         println(diff)
@@ -220,28 +225,29 @@ function solve_transition(para)
         end
         F[:] = results[:,1];
     end
-    #k_trans = readdlm("../data/HA_rational/k_trans1sd.csv", ',')
+    k_trans = readdlm("../data/HA_rational/k_trans1sd_yearly_noiid.csv", ',')
 
-    initial_k = ones(T) * k̄
-    initial_F = zeros(T)
-    df = OnceDifferentiable(f!,j!,fj!,initial_k,initial_F)
-    res = nlsolve(df,initial_k)
-    k_trans = res.zero::Vector{Float64}
+    #initial_k = ones(T) * k̄
+    #initial_F = zeros(T)
+    #df = OnceDifferentiable(f!,j!,fj!,initial_k,initial_F)
+    #res = nlsolve(df,initial_k)
+    #k_trans = res.zero::Vector{Float64}
+    f(k_trans)
 
-    coeffs, R = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
-    Ct, Nt, Kt = compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
-    return k_trans, coeffs, R, Ct, Nt, Kt
+    #coeffs, R = compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid,h̄grid, π̄)
+    df = compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid,h̄grid, π̄)
+    return k_trans,df
 end
 
 
-function compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
+function compute_coeffs(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid,h̄grid, π̄)
     @unpack α, δ, a_min, a_max, N, σ = para
     r̄ = α * k̄ ^ (α - 1) - δ
     k = vcat(k_trans, k̄) #running from time 0 to T
     rt = α * θt .* k .^ (α - 1) - δ
     wt = (1 - α) * θt .* k .^ α
     cft = get_cft(para, T, rt, wt, cf_ss)
-    πt, ngrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid, T)
+    πt, ngrid_t, hgrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid,h̄grid, T)
     bin_midpts = get_bins(a_min, a_max, N)
     # Compute ln(K_t - \bar K) for each year
     Kt = [k[t] * ngrid_t[:, t]' * πt[:, t] for t in 1:T + 1]
@@ -277,19 +283,25 @@ end
 
 
 
-function compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
+function compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid,h̄grid, π̄)
     @unpack α, δ, a_min, a_max, N, σ = para
     r̄ = α * k̄ ^ (α - 1) - δ
+    w̄ = (1-α) * k̄ ^(α)
+    K̄ = dot(π̄,agrid) #steady state capital
+    N̄ = dot(π̄,n̄grid)
+    H̄ = dot(π̄,h̄grid)
+
     k = vcat(k_trans, k̄) #running from time 0 to T
     rt = α * θt .* k .^ (α - 1) - δ
     wt = (1 - α) * θt .* k .^ α
     cft = get_cft(para, T, rt, wt, cf_ss)
-    πt, ngrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid, T)
+    πt, ngrid_t, hgrid_t = get_πt(para, cft, rt, wt, π̄, n̄grid,h̄grid, T)
     bin_midpts = get_bins(a_min, a_max, N)
     # Compute ln(K_t - \bar K) for each year
     Kt = [k[t] * ngrid_t[:, t]' * πt[:, t] for t in 1:T + 1]
     Ct = zeros(T)
     Nt = zeros(T)
+    Ht = zeros(T)
     for t in 1:T
         cgrid = similar(πt[:, t])
         for indx in 1:size(πt, 1)
@@ -299,16 +311,28 @@ function compute_paths(para, k_trans, θt, agrid, k̄, cf_ss, T, n̄grid, π̄)
         end
         Ct[t] = dot(πt[:, t], cgrid)
         Nt[t] = dot(πt[:, t], ngrid_t[:, t])
+        Ht[t] = dot(πt[:, t], hgrid_t[:, t])
     end
-    return Ct, Nt, Kt
+    Yt = θt[1:T] .* Kt[1:T].^α .* Nt.^(1-α)
+    Ȳ = K̄^α * N̄ ^(1-α)
+    It = Kt[2:T+1] - (1-δ)*Kt[1:T]
+    Ī = K̄ - (1-δ) * K̄
+    #compute impulse response all in % deviations
+    df = DataFrame()
+    df[:r] = 100*(rt[1:T] .- r̄)
+    df[:w] = 100*(wt[1:T] ./ w̄ - 1.)
+    df[:K] = 100*(Kt[1:T] ./ K̄ - 1.)
+    df[:Y] = 100*(Yt[1:T] ./ Ȳ - 1.)
+    df[:I] = 100*(It[1:T] ./ Ī - 1.)
+    df[:H] = 100*(Ht[1:T] ./ H̄ - 1. )
+    df[:N] = 100*(Nt[1:T] ./ N̄ - 1.)
+    return df
 end
 
 
 
-para = HAmodel()
+para = HAmodel(iid=false)
 println("Fixed")
 println(para.a_min)
-k_trans, coeffs, R, Ct, Nt, Kt = solve_transition(para)
-writedlm("../data/HA_rational/psi1sd_amin.csv", coeffs, ',')
-writedlm("../data/HA_rational/R1sd_amin.csv", R, ',')
-writedlm("../data/HA_rational/k_trans1sd_amin.csv", k_trans, ',')
+k_trans, df = solve_transition(para)
+CSV.write("../data/HA_rational/noiid_impulse.csv",df)
