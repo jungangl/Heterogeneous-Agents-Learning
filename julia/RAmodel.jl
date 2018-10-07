@@ -2,6 +2,7 @@ using NLsolve, Parameters, Distributions, Plots, Roots
 @with_kw type RAmodel
   #fundamental paramters
   yearly::Bool = true
+  from_RE::Bool = true
   K2Y::Float64 = yearly * (10.26 / 4) + !yearly * 10.26 #targeted
   σ::Float64 = 2.
   γ::Float64 = 2.
@@ -21,7 +22,7 @@ using NLsolve, Parameters, Distributions, Plots, Roots
   ν̄::Float64 = yearly * 5.86998661276779 + !yearly * 1.1981160163055604
   #simul_learningation parameters
   T::Int64 = 10_000
-  ψ̄::Vector{Float64} =  yearly * [-0.00155074; -0.720212977; -0.777467909] + !yearly * [ -0.001314661;  -0.765090668;   -0.655607579]
+  ψ̄::Vector{Float64} =  !from_RE * [0.; -1.; -1] + from_RE * (yearly * [0.; -0.720212977; -0.777467909] + !yearly * [0.;  -0.765090668;   -0.655607579])
   R̄::Matrix{Float64} =  yearly * [1.0000000000  -0.000837131    -0.000349309;
                                   -0.000837131   0.001363378	 0.000498454;
                                   -0.000349309	 0.000498454	 0.000574746] +

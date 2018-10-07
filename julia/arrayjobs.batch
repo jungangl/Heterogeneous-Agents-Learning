@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --partition=short           ### Partition
+#SBATCH --job-name=learning          ### Job Name
+#SBATCH --time=23:59:59             ### WallTime
+#SBATCH --nodes=1                   ### Number of Nodes
+#SBATCH --ntasks=1                  ### Number of tasks per array job
+#SBATCH --array=0-15                 ### Array index
+
+echo "I am Slurm job ${SLURM_JOB_ID}, array job ${SLURM_ARRAY_JOB_ID}, and array task ${SLURM_ARRAY_TASK_ID}."
+
+module load julia
+julia /projects/devans_econ/shared/locally_rational_agents/julia/HA_learning.jl ${SLURM_ARRAY_TASK_ID}

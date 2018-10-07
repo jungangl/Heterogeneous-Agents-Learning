@@ -47,15 +47,17 @@ end
     seed::Int64 = 1
     from_zero::Bool = true
     gain_low::Bool = true
+    pos::Bool = true
     ## Define paths
     yearly_str::String = if yearly "yearly" else "quarterly" end
     iid_str::String = if iid "iid" else "noiid" end
     amin_str::String = if high_amin "high_amin" else "low_amin" end
     from_str::String = if from_zero "from_zeros" else "from_rational_RA" end
     gain_str::String = if gain_low "gain_0.005" else "gain_0.01" end
+    pos_str::String = if pos "positive" else "negative" end
     stat_path::String = "HA/$(yearly_str)/$(iid_str)_$(amin_str)/stationary"
     lear_path::String = "HA/$(yearly_str)/$(iid_str)_$(amin_str)/learning/seed$(seed)/simulations/$(from_str)/$(gain_str)"
-    ## Calibration
+    irf_path::String = "HA/$(yearly_str)/$(iid_str)_$(amin_str)/learning/seed$(seed)/IRFs/$(pos_str)/$(gain_str)" ## Calibration
     σ::Float64 = 2.
     γ::Float64 = 2.
     β::Float64 = readdlm("../data/$(stat_path)/calibration/beta.csv")[1]
@@ -65,7 +67,7 @@ end
     α::Float64 = 0.36
     δ::Float64 = (yearly) * (0.1) + (!yearly) * (0.025)
     χ::Float64 = readdlm("../data/$(stat_path)/calibration/chi.csv")[1]
-    γ_gain::Function = t -> (gain_low) * (0.005) + (!gain_low) * (0.01)
+    γ_gain::Function = t -> ((gain_low) * (0.005) + (!gain_low) * (0.01))
     ## Steady state values
     ā::Float64 = -Inf
     r̄::Float64 = α * inv(K2Y) - δ
@@ -84,7 +86,7 @@ end
     S::Int64 = length(A)
     N_ϕ::Int64 = 50
     ## Environment variables
-    a_min::Float64 = (high_amin) * (0.) + (!high_amin) * (-0.8 * A[1] * w̄ / r̄)
+    a_min::Float64 = (high_amin) * (0.) + (!high_amin) * (-1. * (yearly * 0.7 + !yearly * 0.8) * A[1] * w̄ / r̄)
     a_max::Float64 = (yearly) * (50.) + (!yearly) * (300.)
     Na::Int64 = 150 #number of asset grid points for spline
     ϕ_min::Float64 = 0.
@@ -210,7 +212,7 @@ end
 ## Function that computes the fixed point for the consumption function
 function get_cf(para)
     compute_cmin!(para)
-    @unpack r̄, w̄, a_min, a_max,Na, S, A, k_spline = para
+    @unpack r̄, w̄, a_min, a_max, Na, S, A, k_spline = para
     ## Set more curvature when in the lower range of a′grid
     a′grid = construct_agrid(a_min,a_max,Na)
     N = length(a′grid)
@@ -245,16 +247,16 @@ function plot_policies(para)
     cf = get_cf(para)
     p_c = plot(grid = false, xlabel = "a", ylabel = "c", title = "consumption policy")
     for s in 1:S
-        plot!(p_c, a -> cf[s](a), a_min, a_max, label = "s = $s")
+        plot!(p_c, a -> cf[s](a), a_min, a_max, label = "")
     end
     p_n = plot(grid = false, xlabel = "a", ylabel = "n", title = "labor policy")
     for s in 1:S
-        plot!(p_n, a -> max(1 - ((w̄ * A[s] * cf[s](a) ^ (-σ)) / χ) ^ (-1 / γ), 0), a_min, a_max, label = "s = $s")
+        plot!(p_n, a -> max(1 - ((w̄ * A[s] * cf[s](a) ^ (-σ)) / χ) ^ (-1 / γ), 0), a_min, a_max, label = "")
     end
     p_aprime = plot(grid = false, xlabel = "a", ylabel = "aprime", title = "aprime policy")
     for s in 1:S
         plot!(p_aprime, a -> (1 + r̄) * a + A[s] * w̄ * max(1 - ((w̄ * A[s] * cf[s](a) ^ (-σ)) / χ) ^ (-1 / γ), 0) - cf[s](a),
-              a_min, a_max, label = "s = $s")
+              a_min, a_max, label = "")
     end
     savefig(p_c, "../figures/$(stat_path)/policies/c.pdf")
     savefig(p_n, "../figures/$(stat_path)/policies/n.pdf")
@@ -418,10 +420,12 @@ function save_wealth_dist(para, π)
     end
     p1 = scatter(agrid[1:5], πgrid[1:5], label = "a", grid = false, title = "wealth distribtion for a in ($(agrid[1]), $(round(agrid[5], 2)))")
     p2 = scatter(agrid[6:end], πgrid[6:end], label = "a", title = "wealth distribution from a = $(agrid[6])", grid = false)
+    p3 = scatter(agrid[1:end], πgrid[1:end], label = "a", title = "wealth distribution", grid = false)
     writedlm("../data/$(stat_path)/over_a/a.csv", agrid, ',')
     writedlm("../data/$(stat_path)/over_a/pi.csv", πgrid, ',')
     savefig(p1, "../figures/$(stat_path)/over_a/wealth_low.pdf")
     savefig(p2, "../figures/$(stat_path)/over_a/wealth_high.pdf")
+    savefig(p3, "../figures/$(stat_path)/over_a/wealth.pdf")
 end
 
 
@@ -454,6 +458,7 @@ for yearly in [true; false]
     end
 end
 =#
+
 
 
 #=
