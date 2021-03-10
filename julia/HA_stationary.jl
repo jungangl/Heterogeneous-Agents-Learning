@@ -99,8 +99,8 @@ end
     stat_path::String = "HA/$(yearly_str)/$(iid_str)/stationary"
     lear_path::String = "HA/$(yearly_str)/$(iid_str)/learning/simulations/$(from_str)/$(gain_str)"
     irf_path::String = "HA/$(yearly_str)/$(iid_str)/learning/IRFs/$(gain_str)" ## Calibration
-    σ::Float64 = if σ_str == "h" 2.0 elseif σ_str == "m" 1.0 elseif σ_str == "l" 1.0 end
-    γ::Float64 = if γ_str == "h" 2.0 elseif γ_str == "m" 1.0 elseif γ_str == "l" 1.0 end
+    σ::Float64 = if σ_str == "h" 2.0 elseif σ_str == "m" 1.0 elseif σ_str == "l" 0.5 end
+    γ::Float64 = if γ_str == "h" 2.0 elseif γ_str == "m" 1.0 elseif γ_str == "l" 0.5 end
     β::Float64 = readdlm("../data/$(stat_path)/calibration/beta.csv")[1]
     ρ::Float64 = (yearly) * (0.95 ^ 4) + (!yearly) * (0.95)
     σ_ϵ::Float64 = (yearly) * (0.014) + (!yearly) * (0.007)
