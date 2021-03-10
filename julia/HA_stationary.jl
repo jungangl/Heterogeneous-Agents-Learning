@@ -101,13 +101,13 @@ end
     irf_path::String = "HA/$(yearly_str)/$(iid_str)/learning/IRFs/$(gain_str)" ## Calibration
     σ::Float64 = if σ_str == "h" 2.0 elseif σ_str == "m" 1.0 elseif σ_str == "l" 0.5 end
     γ::Float64 = if γ_str == "h" 2.0 elseif γ_str == "m" 1.0 elseif γ_str == "l" 0.5 end
-    β::Float64 = readdlm("../data/$(stat_path)/calibration/beta.csv")[1]
+    β::Float64 = 0.99#readdlm("../data/$(stat_path)/calibration/beta.csv")[1]
     ρ::Float64 = (yearly) * (0.95 ^ 4) + (!yearly) * (0.95)
     σ_ϵ::Float64 = (yearly) * (0.014) + (!yearly) * (0.007)
     K2Y::Float64 = (yearly) * (10.26 / 4) + (!yearly) * (10.26)
     α::Float64 = 0.36
     δ::Float64 = (yearly) * (0.1) + (!yearly) * (0.025)
-    χ::Float64 = readdlm("../data/$(stat_path)/calibration/chi.csv")[1]
+    χ::Float64 = 1.1#readdlm("../data/$(stat_path)/calibration/chi.csv")[1]
     γ_gain::Function = t -> ((gain == 1) * (0.001) + (gain == 2) * (0.005) + (gain == 3) * (0.01))
     ## Steady state values
     ā::Float64 = -Inf
@@ -139,7 +139,7 @@ end
     ## Simulation paramters
     T::Int64 = 30_000
     agent_num::Int64 = 100_000
-    R̄::Matrix{Float64} = readdlm("../data/RA/$(yearly_str)/rational/$(σ_str)$(γ_str)/R_cov.csv", ',')
+    R̄::Matrix{Float64} = Matrix{Float64}(I,3,3)#Matrreaddlm("../data/RA/$(yearly_str)/rational/$(σ_str)$(γ_str)/R_cov.csv", ',')
     ψ_init::Matrix{Float64} = (from_zero)  * zeros(agent_num, 3) +
                               (!from_zero) * readdlm("../data/RA/$(yearly_str)/rational/$(σ_str)$(γ_str)/psi.csv", ',')' .* ones(agent_num)
 
@@ -439,14 +439,15 @@ end
 # (1) capital to output ratio K2Y
 # (2) labor supply
 function stationary_resid(x, α, K2Y, n̄, K2EN, para)
-    para.β, para.χ = x
+    para.β, para.χ = x[1],exp(x[2])
+    println(x)
     π, ϵn_grid, n_grid, a_grid, c_grid = stat_dist(para, K2EN)
     ϵn = dot(ϵn_grid, π)
     n = dot(n_grid, π)
     K2EN = dot(a_grid, π) / ϵn
     diff_K2Y = max(K2EN, 0.) ^ (1 - α) - K2Y
     diff_n̄ = n - n̄
-    #println("diff_K2Y = $diff_K2Y, diff_n̄ = $diff_n̄")
+    println("diff_K2Y = $diff_K2Y, diff_n̄ = $diff_n̄")
     return diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid, c_grid
 end
 
@@ -456,9 +457,9 @@ end
 function calibrate_stationary!(para)
     @unpack α, K2Y, n̄ = para
     K2EN = (K2Y) ^ (1 / (1 - α))
-    #res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; para.χ]; inplace = false)
-    #para.β, para.χ = res.zero
-    diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid, c_grid = stationary_resid([para.β, para.χ], α, K2Y, n̄, K2EN, para)
+    res = nlsolve(x -> stationary_resid(x, α, K2Y, n̄, K2EN, para)[1:2], [para.β; log(para.χ)]; inplace = false)
+    para.β, para.χ = res.zero[1],exp(res.zero[2])
+    diff_K2Y, diff_n̄, π, K2EN, ϵn_grid, n_grid, a_grid, c_grid = stationary_resid([para.β, log(para.χ)], α, K2Y, n̄, K2EN, para)
     para.ā = dot(π, a_grid)
     return para, π, K2EN, ϵn_grid, n_grid, a_grid, c_grid
 end
