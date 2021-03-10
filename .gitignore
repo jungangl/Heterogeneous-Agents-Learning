@@ -1,5 +1,4 @@
 *.eps
 *.mat
-data/*
 *.dat
 *.DS_Store
